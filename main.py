@@ -163,9 +163,10 @@ async def emptyfavs(interaction: discord.Interaction):
 async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment, toptext: str=" ", bottext: str=" "):
     if 'image' in image.content_type:
         await interaction.response.defer()
-        await image.save("tempImage.png")
-        template = Image.open("tempImage.png")
+        await image.save("tempImage.jpg")
+        template = Image.open("tempImage.jpg")
         print("File successfully opened")
+        template = template.convert("RGB")
         font_size = int(template.width/10)
         font = ImageFont.truetype("impact.ttf", font_size)
         stroke_color = (0, 0, 0) #black
@@ -183,7 +184,7 @@ async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment,
             tw, th = font.getsize(line)
             draw = ImageDraw.Draw(template)
             draw.text((cx-tw/2, cy), line, text_color, font=font, stroke_width=stroke_width, stroke_fill=stroke_color)
-            template.save("meme-generated.png", "PNG")
+            template.save("meme-generated.jpg", "JPG")
             y_text += th
 
         # Bottom Text
@@ -196,11 +197,21 @@ async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment,
             tw, th = font.getsize(line)
             draw = ImageDraw.Draw(template)
             draw.text((cx-tw/2, y_text), line, text_color, font=font, stroke_width=stroke_width, stroke_fill=stroke_color)
-            template.save("meme-generated.png", "PNG")
+            template.save("meme-generated.png", "jpg")
             y_text += th
 
         #await interaction.response.send_message(file=discord.File("meme-generated.png"))
-        await interaction.followup.send(file=discord.File("meme-generated.png"))
+        img_quality = 100
+        while os.path.getsize("meme-generated.jpg") >= 8000000:
+            img_quality -= 5
+            template.save("meme-generated.png", "jpg", optimize=True, quality=img_quality)
+            if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
+                await interaction.followup.send("File is too large!")
+                return
+
+        await interaction.followup.send(file=discord.File("meme-generated.jpg"))
+    else:
+        interaction.response.send_message("File must be an image!")
 
 
 # On message...
@@ -226,6 +237,8 @@ async def on_message(message):
     if message.content.lower() == "who asked":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
+
+
 
 
 client.run(BotToken)
