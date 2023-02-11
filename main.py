@@ -17,20 +17,6 @@ baidID = 116734104300421122  # testing purposes
 MeiMeiID = 1001538703296057455
 baidcologyID = 987848902315245598
 
-# - Run once in order to transfer and format existing data to data.json
-# with open('data.json', 'w') as fdata:
-#  fdata.write('{\n')
-#  with open('input.txt', 'r') as f:
-#    for line in f:
-#       iter = 0
-#      for i in line:
-#        if i == '-':
-#          line1 = line[:iter-1]
-#          line2 = line[iter+2:-1]
-#        iter += 1
-#      fdata.write(f"\"{line1}\": \"{line2}\",\n")
-#  fdata.write("\n}")
-
 # cycle activity status
 bot_status = cycle(
     ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3",
@@ -74,11 +60,13 @@ async def addfav(interaction: discord.Interaction, item: str):
         data = json.load(fr)
         fr.close()
         item = item.lower()
+        # if item is not in dictionary, copy entire dictionary except the last line
+        # add a comma to end of second to last line and add a new line with the added item
+        # and corresponding value "None", then write it back to data.json
         if data.get(item, "failed") == "failed":
             with open("data.json", "r") as fr:
                 lines = fr.readlines()[:-1]
                 lines[-1] = lines[-1][:-1] + ','
-                print(lines[-1])
                 fr.close()
 
                 item2 = None
@@ -97,6 +85,7 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
     if (interaction.user.id == FoldenID):
         data = {}
         thing = thing.lower()
+        # if favorite is NOT a URL, convert to lowercase.
         if not favorite.startswith("http"):
             favorite = favorite.lower()
         with open("data.json", "r+") as f:
@@ -122,7 +111,7 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
 async def emptyfavs(interaction: discord.Interaction):
     data = {}
     emptyItems = ""
-    # embed message
+    # embed message format setup
     embed_message = discord.Embed(title="Empty Favorites", description="Foldenpaper must set these with /updatefav",
                                   color=discord.Color.orange())
     embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
@@ -130,8 +119,11 @@ async def emptyfavs(interaction: discord.Interaction):
 
     with open("data.json", 'r') as f:
         data = json.load(f)
+    # iterate through entire dictionary, if the favorite is listed as "None"
+    # add the corresponding 'thing' to 'emptyItems' string array
     for thing, favorite in data.items():
         if favorite == "None":
+            # if emptyItems is empty, dont start with a new line
             if emptyItems == "":
                 emptyItems += thing
             else:
@@ -160,51 +152,64 @@ async def emptyfavs(interaction: discord.Interaction):
 #   await interaction.response.send_message(embed=embed_message)
 
 @client.tree.command(name="meme", description="Add text to an image")
-async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment, toptext: str=" ", bottext: str=" "):
+async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment, toptext: str = " ",
+                    bottext: str = " "):
+    # check if file is an image content type
     if 'image' in image.content_type:
+        # defer allows discord to wait for a response longer than 3 seconds
         await interaction.response.defer()
+        # download the attached image
         await image.save("tempImage.jpg")
         template = Image.open("tempImage.jpg")
-        print("File successfully opened")
+        # Convert to JPG
         template = template.convert("RGB")
-        font_size = int(template.width/10)
+        # font size scales with image width
+        font_size = int(template.width / 10)
         font = ImageFont.truetype("impact.ttf", font_size)
-        stroke_color = (0, 0, 0) #black
-        stroke_width = int(font_size/10)
-        text_color = (255, 255, 255) #white
-        text_margin = int((template.height/100)*2)
+        stroke_color = (0, 0, 0)  # black
+        stroke_width = int(font_size / 10)
+        text_color = (255, 255, 255)  # white
+        # text margin scales with image height
+        text_margin = int((template.height / 100) * 2)
 
-        # Top Text
+        # Top Text -------------------------------------------
+        # split string into multiple strings based on character length 'width'
         lines = textwrap.wrap(toptext.upper(), width=20)
+        # text width and height
         tw, th = font.getsize(toptext)
-        cx, cy = int(template.width/2), text_margin
-        y_text = (cy-th/2)
+        # top left text box coordinate with respect to image pixels. Top left of image is 0,0
+        cx, cy = int(template.width / 2), text_margin
+        # y_text offset
+        y_text = (cy - th / 2)
 
         for line in lines:
             tw, th = font.getsize(line)
             draw = ImageDraw.Draw(template)
-            draw.text((cx-tw/2, cy), line, text_color, font=font, stroke_width=stroke_width, stroke_fill=stroke_color)
+            draw.text((cx - tw / 2, cy), line, text_color, font=font, stroke_width=stroke_width,
+                      stroke_fill=stroke_color)
             template.save("meme-generated.jpg", "JPG")
             y_text += th
 
-        # Bottom Text
+        # Bottom Text -------------------------------------------
         lines = textwrap.wrap(bottext.upper(), width=20)
         tw, th = font.getsize(bottext)
-        cx, cy = (template.width/2, template.height-text_margin)
-        y_text = (cy-th*len(lines))
+        cx, cy = (template.width / 2, template.height - text_margin)
+        y_text = (cy - th * len(lines))
 
         for line in lines:
             tw, th = font.getsize(line)
             draw = ImageDraw.Draw(template)
-            draw.text((cx-tw/2, y_text), line, text_color, font=font, stroke_width=stroke_width, stroke_fill=stroke_color)
+            draw.text((cx - tw / 2, y_text), line, text_color, font=font, stroke_width=stroke_width,
+                      stroke_fill=stroke_color)
             template.save("meme-generated.png", "jpg")
             y_text += th
 
-        #await interaction.response.send_message(file=discord.File("meme-generated.png"))
+        # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
         img_quality = 100
         while os.path.getsize("meme-generated.jpg") >= 8000000:
             img_quality -= 5
             template.save("meme-generated.png", "jpg", optimize=True, quality=img_quality)
+            # if (somehow) image quality is at 0 and the file is still too large, return a message
             if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
                 await interaction.followup.send("File is too large!")
                 return
@@ -229,7 +234,7 @@ async def on_message(message):
          or message.content.endswith('er*')
          or message.content.endswith('er:')
          or message.content.endswith('er!'))
-            and message.author.id != MeiMeiID # MeiMei is not to be trusted...
+            and message.author.id != MeiMeiID  # MeiMei is not to be trusted...
             and message.author.id != baidID
             and message.guild.id == baidcologyID):
         await message.channel.send(f"{message.content}? I hardly know her")
@@ -242,4 +247,3 @@ async def on_message(message):
 
 
 client.run(BotToken)
-
