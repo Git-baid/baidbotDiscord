@@ -1,13 +1,16 @@
 # data in data.json is community generated and unmoderated
 
-import discord
+from io import BytesIO
 import json
-from discord.ext import commands, tasks
-from itertools import cycle
-from PIL import Image, ImageFont, ImageDraw
-from token import BotToken
-import textwrap
 import os
+import textwrap
+from itertools import cycle
+
+import discord
+from PIL import Image, ImageFont, ImageDraw, ImageSequence
+from discord.ext import commands, tasks
+
+from DiscordBotToken import BotToken
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -16,11 +19,12 @@ FoldenID = 274705127380615179
 baidID = 116734104300421122  # testing purposes
 MeiMeiID = 1001538703296057455
 baidcologyID = 987848902315245598
+baidbotdevserverID = 1072108038577725551
 
 # cycle activity status
 bot_status = cycle(
     ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3",
-     "Now with 30% less sugar!"])
+     "Text centering and margin spacing", "with Lebel 1886"])
 
 
 @tasks.loop(seconds=300)
@@ -31,6 +35,7 @@ async def change_status():
 @client.event
 async def on_ready():
     await client.tree.sync()
+    await client.tree.sync(guild=discord.Object(id=baidbotdevserverID))
     print(f"Ready to use as {client.user}.")
     change_status.start()
 
@@ -152,8 +157,8 @@ async def emptyfavs(interaction: discord.Interaction):
 #   await interaction.response.send_message(embed=embed_message)
 
 @client.tree.command(name="meme", description="Add text to an image")
-async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment, toptext: str = " ",
-                    bottext: str = " "):
+async def meme(interaction: discord.Interaction, image: discord.Attachment, toptext: str = " ",
+               bottext: str = " "):
     # check if file is an image content type
     if 'image' in image.content_type:
         # defer allows discord to wait for a response longer than 3 seconds
@@ -187,8 +192,8 @@ async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment,
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, cy), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.jpg", "JPG")
-            y_text += th
+            template.save("meme-generated.jpg")
+            cy += th
 
         # Bottom Text -------------------------------------------
         lines = textwrap.wrap(bottext.upper(), width=20)
@@ -201,14 +206,15 @@ async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment,
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, y_text), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.png", "jpg")
+            template.save("meme-generated.jpg")
             y_text += th
 
         # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
         img_quality = 100
         while os.path.getsize("meme-generated.jpg") >= 8000000:
+            print(f"File is too large! Compressing image to {img_quality}%")
             img_quality -= 5
-            template.save("meme-generated.png", "jpg", optimize=True, quality=img_quality)
+            template.save("meme-generated.jpg", "jpg", optimize=True, quality=img_quality)
             # if (somehow) image quality is at 0 and the file is still too large, return a message
             if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
                 await interaction.followup.send("File is too large!")
@@ -216,7 +222,64 @@ async def emptyfavs(interaction: discord.Interaction, image: discord.Attachment,
 
         await interaction.followup.send(file=discord.File("meme-generated.jpg"))
     else:
-        interaction.response.send_message("File must be an image!")
+        await interaction.response.send_message("File must be an image!")
+
+
+@client.tree.command(name="gifmeme", description="Caption a GIF")
+async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment, caption: str):
+    if 'gif' in gif_file.content_type:
+        # defer allows discord to wait for a response longer than 3 seconds
+        await interaction.response.defer()
+
+        # download the attached GIF
+        await gif_file.save("input.gif")
+        giftemplate = Image.open("input.gif")
+        font_size = int(giftemplate.width / 10)
+        font = ImageFont.truetype("Futura Condensed Extra Bold Regular.ttf", font_size)
+        text_color = (0, 0, 0)  # black
+
+        lines = textwrap.wrap(caption, width=17)
+        # text width and height
+        tw, th = font.getsize(caption)
+
+        # height of white box to add at top
+        padding_height = int((th * len(lines)) + th/2)
+        # top left text box coordinate with respect to image pixels. Top left of image is 0,0
+        cx, cy = int(giftemplate.width / 2), int((padding_height/2))
+        # y_text offset
+        y_text = (cy - (th/2) * len(lines))
+
+        base_width, base_height = giftemplate.size
+        new_height = base_height + padding_height
+
+        # create empty white frame with extra height for text
+        result_template = Image.new("RGBA", size=(base_width, new_height), color=(255, 255, 255))
+
+        # draw text lines in the extra height
+        for line in lines:
+            tw, th = font.getsize(line)
+            draw = ImageDraw.Draw(result_template)
+            draw.text((cx - tw / 2, y_text), line, text_color, font=font)
+            y_text += th
+
+        # total duration of gif
+        total_duration = 0
+        frames = []
+        for frame in ImageSequence.Iterator(giftemplate):
+            # add duration of current frame to total duration
+            total_duration += frame.info['duration']
+            # paste each frame of gif under extra height
+            temp = result_template
+            temp.paste(frame, (0, padding_height))
+            b = BytesIO()
+            temp.save(b, format="GIF")
+            temp = Image.open(b)
+            frames.append(temp)
+        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=giftemplate.info['loop'],
+                       duration=total_duration/len(frames))
+        await interaction.followup.send(file=discord.File("meme_out.gif"))
+    else:
+        await interaction.response.send_message("File must be a GIF!")
 
 
 # On message...
@@ -227,17 +290,6 @@ async def on_message(message):
     message.content = message.content.lower()
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
         await message.channel.send("Heyo! :wave:")
-
-    if ((message.content.endswith('er')
-         or message.content.endswith('er.')
-         or message.content.endswith('er?')
-         or message.content.endswith('er*')
-         or message.content.endswith('er:')
-         or message.content.endswith('er!'))
-            and message.author.id != MeiMeiID  # MeiMei is not to be trusted...
-            and message.author.id != baidID
-            and message.guild.id == baidcologyID):
-        await message.channel.send(f"{message.content}? I hardly know her")
 
     if message.content.lower() == "who asked":
         await message.channel.send(
