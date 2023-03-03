@@ -4,6 +4,11 @@ from io import BytesIO
 import json
 import os
 import textwrap
+
+# For insurance reminder
+import asyncio
+import time
+
 from itertools import cycle
 
 import discord
@@ -23,8 +28,7 @@ baidbotdevserverID = 1072108038577725551
 
 # cycle activity status
 bot_status = cycle(
-    ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3",
-     "Text centering and margin spacing", "with Lebel 1886"])
+    ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3", "Now lactose-free!", "Now with /help"])
 
 
 @tasks.loop(seconds=300)
@@ -87,11 +91,11 @@ async def addfav(interaction: discord.Interaction, item: str):
 # Update favorite
 @client.tree.command(name="updatefav", description="Updates favorite thing (Can only be executed by Foldenpaper)")
 async def updatefav(interaction: discord.Interaction, thing: str, favorite: str):
-    if (interaction.user.id == FoldenID):
+    if (interaction.user.id == FoldenID or interaction.user.id == baidID):
         data = {}
         thing = thing.lower()
-        # if favorite is NOT a URL, convert to lowercase.
-        if not favorite.startswith("http"):
+        # if favorite is NOT a URL or exception greek letter, convert to lowercase.
+        if not favorite.startswith("http") and thing != "greek letter":
             favorite = favorite.lower()
         with open("data.json", "r+") as f:
             data = json.load(f)
@@ -164,10 +168,9 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         # defer allows discord to wait for a response longer than 3 seconds
         await interaction.response.defer()
         # download the attached image
-        await image.save("tempImage.jpg")
-        template = Image.open("tempImage.jpg")
-        # Convert to JPG
-        template = template.convert("RGB")
+        await image.save("tempImage.png")
+        template = Image.open("tempImage.png")
+
         # font size scales with image width
         font_size = int(template.width / 10)
         font = ImageFont.truetype("impact.ttf", font_size)
@@ -192,7 +195,7 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, cy), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.jpg")
+            template.save("meme-generated.png")
             cy += th
 
         # Bottom Text -------------------------------------------
@@ -206,21 +209,23 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, y_text), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.jpg")
+            template.save("meme-generated.png")
             y_text += th
 
         # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
-        img_quality = 100
-        while os.path.getsize("meme-generated.jpg") >= 8000000:
-            print(f"File is too large! Compressing image to {img_quality}%")
-            img_quality -= 5
-            template.save("meme-generated.jpg", "jpg", optimize=True, quality=img_quality)
-            # if (somehow) image quality is at 0 and the file is still too large, return a message
-            if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
-                await interaction.followup.send("File is too large!")
-                return
-
-        await interaction.followup.send(file=discord.File("meme-generated.jpg"))
+        if os.path.getsize(("meme-generated.png")) >= 8000000:
+            img_quality = 100
+            while os.path.getsize("meme-generated.jpg") >= 8000000:
+                print(f"File is too large! Compressing image to {img_quality}% as JPG")
+                template.save("meme-generated.jpg", "jpg", optimize=True, quality=img_quality)
+                img_quality -= 5
+                # if (somehow) image quality is at 0 and the file is still too large, return a message
+                if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
+                    await interaction.followup.send("File is too large!")
+                    return
+            await interaction.followup.send(file=discord.File("meme-generated.jpg"))
+            return
+        await interaction.followup.send(file=discord.File("meme-generated.png"))
     else:
         await interaction.response.send_message("File must be an image!")
 
@@ -281,6 +286,71 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
     else:
         await interaction.response.send_message("File must be a GIF!")
 
+@client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
+async def meme(interaction: discord.Interaction, image: discord.Attachment):
+    if "image" in image.content_type:
+        await interaction.response.defer()
+        await image.save("speechmemetemp.png")
+        speech_template = Image.open("speechmemetemp.png")
+        speech_bubble = Image.open("SBOverlay.png")
+        speech_bubble = speech_bubble.resize((speech_template.width, int(speech_template.height/3)))
+        # Check if original image has transparency, use alpha_composite() if so
+        if speech_template.mode != "RBGA":
+            speech_template.paste(speech_bubble, (0, 0), speech_bubble)
+        else:
+            speech_template.alpha_composite(speech_bubble, (0, 0))
+        speech_template.save("SBresult.png")
+
+        # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
+        if os.path.getsize(("SBresult.png")) >= 8000000:
+            img_quality = 100
+            while os.path.getsize("SBresult.jpg") >= 8000000:
+                print(f"File is too large! Compressing image to {img_quality}% as JPG")
+                speech_template.save("SBresult.jpg", "jpg", optimize=True, quality=img_quality)
+                img_quality -= 5
+                # if (somehow) image quality is at 0 and the file is still too large, return a message
+                if img_quality == 0 and os.path.getsize("SBresult.jpg") >= 8000000:
+                    await interaction.followup.send("File is too large!")
+                    return
+            await interaction.followup.send(file=discord.File("SBresult.jpg"))
+            return
+        await interaction.followup.send(file=discord.File("SBresult.png"))
+    else:
+        await interaction.response.send_message("File must be an image!")
+
+@client.tree.command(name="insurance", description="Remind yourself to collect Tarkov insurance tomorrow")
+async def insuranceremind(interaction: discord.Interaction):
+    one_day = 86400
+    one_hour = 3600
+    epoch_time = int(time.time())
+    await interaction.response.send_message(f"I will remind you at <t:{epoch_time + one_day + (one_hour*5)}:t> tomorrow to collect your insurance", ephemeral=True)
+    await asyncio.sleep(one_day + (one_hour * 5))
+    await interaction.user.send(f"Collect your Tarkov insurance from yesterday's session at <t:{epoch_time}:t>!")
+
+@client.tree.command(name="help", description="How to use commands")
+async def help(interaction: discord.Interaction):
+    # embed message
+    embed_message = discord.Embed(title="Command Help", color=discord.Color.orange())
+    embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
+    embed_message.set_thumbnail(url=client.user.avatar)
+    embed_message.add_field(name="**Folden favorites:---------------------------**",
+                            value="**/findfav** - Find folden's favorite everything"
+                            "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
+                            "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
+                            "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav"
+                            , inline=False)
+    embed_message.add_field(name="**Meme:---------------------------**",
+                            value="**/meme** - Add top text and/or bottom text to an image in the classic style"
+                            "\n**/gifmeme** - Add text above a gif in a margin in the classic meme gif style"
+                            "\n**/speechbubble** - Add a speech bubble to the top of your image for meme responses"
+                            , inline=False)
+    embed_message.add_field(name="**Misc:---------------------------**",
+                            value="**/insurance** - Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
+                            "\n**/ping** - Returns bot latency"
+                            "\n**/help** - List command help"
+                            , inline=False)
+    await interaction.response.send_message(embed=embed_message, ephemeral=True)
+
 
 # On message...
 @client.event
@@ -289,9 +359,9 @@ async def on_message(message):
         return
     message.content = message.content.lower()
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
-        await message.channel.send("Heyo! :wave:")
+        await message.channel.send(f"Hi <@{message.author.id}>! :heart:")
 
-    if message.content.lower() == "who asked":
+    if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
