@@ -114,6 +114,21 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
     else:
         await interaction.response.send_message("You must be Foldenpaper to run this command!")
 
+# Delete favorite
+@client.tree.command(name="deletefav", description="Deletes favorite thing category from data (Can only be executed by Foldenpaper)")
+async def updatefav(interaction: discord.Interaction, thing: str):
+    if (interaction.user.id == FoldenID or interaction.user.id == baidID):
+        with open("data.json", 'r') as fin:
+            with open("temp.json", 'w') as fout:
+                # delete everything in temp.json
+                fout.truncate(0)
+                # copy line from data.json to temp.json if not user-inputted-thing
+                for line in fin:                                    # I dont really know how this works without copying
+                    if not line.startswith(f"    \"{thing}\":"):    # it back, but it just started working when I was
+                        fout.write(line)                            # trying to debug it, so probably dont touch
+        await interaction.response.send_message(f"Deleted favorite {thing} from data.")
+    else:
+        await interaction.response.send_message("You must be Foldenpaper to run this command!")
 
 # Find empty favorites
 @client.tree.command(name="findemptyfavs", description="Finds and lists favorites with no entry")
@@ -140,26 +155,6 @@ async def emptyfavs(interaction: discord.Interaction):
     embed_message.add_field(name="Empty favorites for the following things:", value=emptyItems, inline=False)
     await interaction.response.send_message(embed=embed_message)
 
-
-# @client.tree.command(name="listfavs", description="List available things to query")
-# async def listfavs(interaction: discord.Interaction):
-#    data = {}
-#    favlist = ""
-#    # embed message
-#    embed_message = discord.Embed(title="Available things", description="All available things to use with /findfav",
-#                                  color=discord.Color.orange())
-#    embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
-#    embed_message.set_thumbnail(url=interaction.guild.icon)
-#   with open("data.json", 'r') as f:
-#        data = json.load(f)
-#   for thing, favorite in data.items():
-#       if favlist == "":
-#           favlist += thing
-#       else:
-#           favlist += (', ' + thing)
-#   embed_message.add_field(name="Things:", value=favlist, inline=False)
-#   await interaction.response.send_message(embed=embed_message)
-
 @client.tree.command(name="meme", description="Add text to an image")
 async def meme(interaction: discord.Interaction, image: discord.Attachment, toptext: str = " ",
                bottext: str = " "):
@@ -172,10 +167,10 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         template = Image.open("tempImage.png")
 
         # font size scales with image width
-        font_size = int(template.width / 10)
+        font_size = int(template.width / 12)
         font = ImageFont.truetype("impact.ttf", font_size)
         stroke_color = (0, 0, 0)  # black
-        stroke_width = int(font_size / 10)
+        stroke_width = int(font_size / 15)
         text_color = (255, 255, 255)  # white
         # text margin scales with image height
         text_margin = int((template.height / 100) * 2)
@@ -337,6 +332,7 @@ async def help(interaction: discord.Interaction):
                             value="**/findfav** - Find folden's favorite everything"
                             "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
                             "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
+                            "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
                             "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav"
                             , inline=False)
     embed_message.add_field(name="**Meme:---------------------------**",
@@ -364,7 +360,6 @@ async def on_message(message):
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
-
 
 
 client.run(BotToken)
