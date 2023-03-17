@@ -1,4 +1,4 @@
-# Hello baidbot
+# Hello baidbot!
 A bot for Discord that provides specific utility to a select few servers
 
 ## 🤖 Features:
