@@ -9,6 +9,7 @@ A bot for Discord that provides specific utility to a select few servers
 
 # Command Help:
 ## **Folden favorites:**
+Folden's favorites data is synchronized between all servers the bot is in. Any entry from one server can be read or modified from any other server.
 
 **/findfav**
 
