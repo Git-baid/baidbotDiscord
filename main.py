@@ -118,14 +118,16 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
 @client.tree.command(name="deletefav", description="Deletes favorite thing category from data (Can only be executed by Foldenpaper)")
 async def updatefav(interaction: discord.Interaction, thing: str):
     if (interaction.user.id == FoldenID or interaction.user.id == baidID):
-        with open("data.json", 'r') as fin:
-            with open("temp.json", 'w') as fout:
-                # delete everything in temp.json
-                fout.truncate(0)
+        with open("data.json", 'r') as data:
+            with open("temp.json", 'w') as temp:
                 # copy line from data.json to temp.json if not user-inputted-thing
-                for line in fin:                                    # I dont really know how this works without copying
-                    if not line.startswith(f"    \"{thing}\":"):    # it back, but it just started working when I was
-                        fout.write(line)                            # trying to debug it, so probably dont touch
+                for line in data:
+                    if not line.startswith(f"    \"{thing}\":"):
+                        temp.write(line)
+        with open("data.json", 'w') as data:
+            with open("temp.json", 'r') as temp:
+                for line in temp:
+                    data.write(line)
         await interaction.response.send_message(f"Deleted favorite {thing} from data.")
     else:
         await interaction.response.send_message("You must be Foldenpaper to run this command!")
@@ -333,7 +335,7 @@ async def help(interaction: discord.Interaction):
                             "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
                             "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
                             "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
-                            "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav"
+                            "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav)"
                             , inline=False)
     embed_message.add_field(name="**Meme:---------------------------**",
                             value="**/meme** - Add top text and/or bottom text to an image in the classic style"
@@ -360,6 +362,7 @@ async def on_message(message):
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
+
 
 
 client.run(BotToken)
