@@ -212,15 +212,16 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
         if os.path.getsize(("meme-generated.png")) >= 8000000:
             img_quality = 100
+            template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
             while os.path.getsize("meme-generated.jpg") >= 8000000:
-                print(f"File is too large! Compressing image to {img_quality}% as JPG")
-                template.save("meme-generated.jpg", "jpg", optimize=True, quality=img_quality)
+                print(f"File is too large! Compressing image to {img_quality}% as JPEG")
+                template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
                 # if (somehow) image quality is at 0 and the file is still too large, return a message
-                if img_quality == 0 and os.path.getsize("meme-generated.jpg") >= 8000000:
+                if img_quality == 0 and os.path.getsize("meme-generated.jpeg") >= 8000000:
                     await interaction.followup.send("File is too large!")
                     return
-            await interaction.followup.send(file=discord.File("meme-generated.jpg"))
+            await interaction.followup.send(file=discord.File("meme-generated.jpeg"))
             return
         await interaction.followup.send(file=discord.File("meme-generated.png"))
     else:
@@ -284,7 +285,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         await interaction.response.send_message("File must be a GIF!")
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
-async def meme(interaction: discord.Interaction, image: discord.Attachment):
+async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
     if "image" in image.content_type:
         await interaction.response.defer()
         await image.save("speechmemetemp.png")
