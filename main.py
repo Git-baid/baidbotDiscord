@@ -25,6 +25,8 @@ baidID = 116734104300421122  # testing purposes
 MeiMeiID = 1001538703296057455
 baidcologyID = 987848902315245598
 baidbotdevserverID = 1072108038577725551
+# maximum response file size without compression
+maxFileSize = 25000000
 
 # cycle activity status
 bot_status = cycle(
@@ -209,16 +211,16 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
             template.save("meme-generated.png")
             y_text += th
 
-        # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
-        if os.path.getsize(("meme-generated.png")) >= 8000000:
+        # Check if image is under 25Mb to be able to upload back, decrease quality of image by 5% on each pass
+        if os.path.getsize(("meme-generated.png")) >= maxFileSize:
             img_quality = 100
             template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
-            while os.path.getsize("meme-generated.jpg") >= 8000000:
+            while os.path.getsize("meme-generated.jpg") >= maxFileSize:
                 print(f"File is too large! Compressing image to {img_quality}% as JPEG")
                 template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
                 # if (somehow) image quality is at 0 and the file is still too large, return a message
-                if img_quality == 0 and os.path.getsize("meme-generated.jpeg") >= 8000000:
+                if img_quality == 0 and os.path.getsize("meme-generated.jpeg") >= maxFileSize:
                     await interaction.followup.send("File is too large!")
                     return
             await interaction.followup.send(file=discord.File("meme-generated.jpeg"))
@@ -299,18 +301,19 @@ async def speechbubble(interaction: discord.Interaction, image: discord.Attachme
             speech_template.alpha_composite(speech_bubble, (0, 0))
         speech_template.save("SBresult.png")
 
-        # Check if image is under 8Mb to be able to upload back, decrease quality of image by 5% on each pass
-        if os.path.getsize(("SBresult.png")) >= 8000000:
+        # Check if image is under 25Mb to be able to upload back, decrease quality of image by 5% on each pass
+        if os.path.getsize(("SBresult.png")) >= maxFileSize:
             img_quality = 100
-            while os.path.getsize("SBresult.jpg") >= 8000000:
-                print(f"File is too large! Compressing image to {img_quality}% as JPG")
-                speech_template.save("SBresult.jpg", "jpg", optimize=True, quality=img_quality)
+            speech_template.save("SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
+            while os.path.getsize("SBresult.jpg") >= maxFileSize:
+                print(f"File is too large! Compressing image to {img_quality}% as JPEG")
+                speech_template.save("SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
                 # if (somehow) image quality is at 0 and the file is still too large, return a message
-                if img_quality == 0 and os.path.getsize("SBresult.jpg") >= 8000000:
+                if img_quality == 0 and os.path.getsize("SBresult.jpeg") >= maxFileSize:
                     await interaction.followup.send("File is too large!")
                     return
-            await interaction.followup.send(file=discord.File("SBresult.jpg"))
+            await interaction.followup.send(file=discord.File("SBresult.jpeg"))
             return
         await interaction.followup.send(file=discord.File("SBresult.png"))
     else:
