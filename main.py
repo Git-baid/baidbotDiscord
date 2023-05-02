@@ -30,7 +30,9 @@ maxFileSize = 25000000
 
 # cycle activity status
 bot_status = cycle(
-    ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3", "Now lactose-free!", "Now with /help"])
+    ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3",
+     "Try /help", "Don't bring a knife to a bomblance fight", "I leave all that I own to my cat Guppy",
+     "Running out of ideas for these"])
 
 
 @tasks.loop(seconds=300)
@@ -81,7 +83,7 @@ async def addfav(interaction: discord.Interaction, item: str):
                 fr.close()
 
                 item2 = None
-                lines.append(f"\n  \"{item}\": \"{item2}\"\n}}")
+                lines.append(f"\n    \"{item}\": \"{item2}\"\n}}")
                 with open("data.json", "w") as fw:
                     fw.writelines(lines)
             await interaction.response.send_message(
@@ -116,23 +118,55 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
     else:
         await interaction.response.send_message("You must be Foldenpaper to run this command!")
 
+
 # Delete favorite
-@client.tree.command(name="deletefav", description="Deletes favorite thing category from data (Can only be executed by Foldenpaper)")
-async def updatefav(interaction: discord.Interaction, thing: str):
+@client.tree.command(name="deletefav",
+                     description="Deletes favorite thing category from data (Can only be executed by Foldenpaper)")
+async def deletefav(interaction: discord.Interaction, thing: str):
     if (interaction.user.id == FoldenID or interaction.user.id == baidID):
+        # open data.json in read mode and open temp.json in write mode
         with open("data.json", 'r') as data:
             with open("temp.json", 'w') as temp:
-                # copy line from data.json to temp.json if not user-inputted-thing
-                for line in data:
-                    if not line.startswith(f"    \"{thing}\":"):
-                        temp.write(line)
+                datafile_lines = data.readlines()
+
+                for i in range(0, len(datafile_lines)):
+                    # if this line is not the target deletion line, and its before the second to last entry
+                    if not datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines)-3:
+                        temp.write(datafile_lines[i])
+                        continue
+                    # if this line is the target line and its not the last or penultimate line, exclude it
+                    # and copy rest of file as is
+                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines)-3:
+                        for j in range(i+1, len(datafile_lines)):
+                            temp.write(datafile_lines[j])
+                        break
+                    # if line is the literal last line of file ( just a closing curly brace), copy that over
+                    if i == len(datafile_lines)-1:
+                        temp.write("}")
+                    # if this line is target line and is also penultimate line, write the last line instead
+                    # and add a curly brace line at the end
+                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i == len(datafile_lines)-3:
+                        temp.write(datafile_lines[i+1])
+                        temp.write("}")
+                        break
+                    # if this line is target line and is also last line, write the penultimate line instead
+                    # without the comma and newline char and add a curly brace line at the end
+                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i == len(datafile_lines) - 2:
+                        temp.write(datafile_lines[i - 1][:-2] + '\n')
+                        temp.write("}")
+                        break
+
+        # open data.json in write mode and temp.json in read mode
         with open("data.json", 'w') as data:
             with open("temp.json", 'r') as temp:
+                # read through temp.json and copy every line back to data.json
                 for line in temp:
+                    print("writing line: " + line + " to data")
                     data.write(line)
         await interaction.response.send_message(f"Deleted favorite {thing} from data.")
     else:
         await interaction.response.send_message("You must be Foldenpaper to run this command!")
+
 
 # Find empty favorites
 @client.tree.command(name="findemptyfavs", description="Finds and lists favorites with no entry")
@@ -158,6 +192,7 @@ async def emptyfavs(interaction: discord.Interaction):
                 emptyItems += ('\n' + thing)
     embed_message.add_field(name="Empty favorites for the following things:", value=emptyItems, inline=False)
     await interaction.response.send_message(embed=embed_message)
+
 
 @client.tree.command(name="meme", description="Add text to an image")
 async def meme(interaction: discord.Interaction, image: discord.Attachment, toptext: str = " ",
@@ -248,11 +283,11 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         tw, th = font.getsize(caption)
 
         # height of white box to add at top
-        padding_height = int((th * len(lines)) + th/2)
+        padding_height = int((th * len(lines)) + th / 2)
         # top left text box coordinate with respect to image pixels. Top left of image is 0,0
-        cx, cy = int(giftemplate.width / 2), int((padding_height/2))
+        cx, cy = int(giftemplate.width / 2), int((padding_height / 2))
         # y_text offset
-        y_text = (cy - (th/2) * len(lines))
+        y_text = (cy - (th / 2) * len(lines))
 
         base_width, base_height = giftemplate.size
         new_height = base_height + padding_height
@@ -281,10 +316,11 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
             temp = Image.open(b)
             frames.append(temp)
         frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=giftemplate.info['loop'],
-                       duration=total_duration/len(frames))
+                       duration=total_duration / len(frames))
         await interaction.followup.send(file=discord.File("meme_out.gif"))
     else:
         await interaction.response.send_message("File must be a GIF!")
+
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
 async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
@@ -293,7 +329,7 @@ async def speechbubble(interaction: discord.Interaction, image: discord.Attachme
         await image.save("speechmemetemp.png")
         speech_template = Image.open("speechmemetemp.png")
         speech_bubble = Image.open("SBOverlay.png")
-        speech_bubble = speech_bubble.resize((speech_template.width, int(speech_template.height/3)))
+        speech_bubble = speech_bubble.resize((speech_template.width, int(speech_template.height / 3)))
         # Check if original image has transparency, use alpha_composite() if so
         if speech_template.mode != "RBGA":
             speech_template.paste(speech_bubble, (0, 0), speech_bubble)
@@ -319,14 +355,18 @@ async def speechbubble(interaction: discord.Interaction, image: discord.Attachme
     else:
         await interaction.response.send_message("File must be an image!")
 
+
 @client.tree.command(name="insurance", description="Remind yourself to collect Tarkov insurance tomorrow")
 async def insuranceremind(interaction: discord.Interaction):
     one_day = 86400
     one_hour = 3600
     epoch_time = int(time.time())
-    await interaction.response.send_message(f"I will remind you at <t:{epoch_time + one_day + (one_hour*5)}:t> tomorrow to collect your insurance", ephemeral=True)
+    await interaction.response.send_message(
+        f"I will remind you at <t:{epoch_time + one_day + (one_hour * 5)}:t> tomorrow to collect your insurance",
+        ephemeral=True)
     await asyncio.sleep(one_day + (one_hour * 5))
     await interaction.user.send(f"Collect your Tarkov insurance from yesterday's session at <t:{epoch_time}:t>!")
+
 
 @client.tree.command(name="help", description="How to use commands")
 async def help(interaction: discord.Interaction):
@@ -336,20 +376,20 @@ async def help(interaction: discord.Interaction):
     embed_message.set_thumbnail(url=client.user.avatar)
     embed_message.add_field(name="**Folden favorites:---------------------------**",
                             value="**/findfav** - Find folden's favorite everything"
-                            "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
-                            "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
-                            "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
-                            "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav)"
+                                  "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
+                                  "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
+                                  "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
+                                  "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav)"
                             , inline=False)
     embed_message.add_field(name="**Meme:---------------------------**",
                             value="**/meme** - Add top text and/or bottom text to an image in the classic style"
-                            "\n**/gifmeme** - Add text above a gif in a margin in the classic meme gif style"
-                            "\n**/speechbubble** - Add a speech bubble to the top of your image for meme responses"
+                                  "\n**/gifmeme** - Add text above a gif in a margin in the classic meme gif style"
+                                  "\n**/speechbubble** - Add a speech bubble to the top of your image for meme responses"
                             , inline=False)
     embed_message.add_field(name="**Misc:---------------------------**",
                             value="**/insurance** - Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
-                            "\n**/ping** - Returns bot latency"
-                            "\n**/help** - List command help"
+                                  "\n**/ping** - Returns bot latency"
+                                  "\n**/help** - List command help"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
@@ -366,7 +406,6 @@ async def on_message(message):
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
-
 
 
 client.run(BotToken)
