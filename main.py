@@ -5,6 +5,9 @@ import json
 import os
 import textwrap
 
+# to communicate with baid's arduino
+import socket
+
 # For insurance reminder
 import asyncio
 import time
@@ -14,6 +17,8 @@ from itertools import cycle
 import discord
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
+from discord import app_commands
+from discord.app_commands import Choice
 
 from DiscordBotToken import BotToken
 
@@ -27,12 +32,18 @@ baidcologyID = 987848902315245598
 baidbotdevserverID = 1072108038577725551
 # maximum response file size without compression
 maxFileSize = 25000000
+# ID of voice channels in baidcology discord for text chat migration
+muteChat = None
+voiceChat1 = None
+voiceChat2 = None
+voiceChat3 = None
+
+conn = socket.socket()  # connection socket placeholder
+led_state = 0
 
 # cycle activity status
 bot_status = cycle(
-    ["with fire", "+ having fun + don't care", "with portals", "try \"hello baidbot!\"", "Half-Life 3",
-     "Try /help", "Don't bring a knife to a bomblance fight", "I leave all that I own to my cat Guppy",
-     "Running out of ideas for these"])
+    ["with fire"])
 
 
 @tasks.loop(seconds=300)
@@ -44,6 +55,13 @@ async def change_status():
 async def on_ready():
     await client.tree.sync()
     await client.tree.sync(guild=discord.Object(id=baidbotdevserverID))
+    global muteChat, voiceChat1, voiceChat2, voiceChat3
+
+    muteChat = client.get_channel(987848902642384945)
+    voiceChat1 = client.get_channel(987848902927605770)
+    voiceChat2 = client.get_channel(987848902927605771)
+    voiceChat3 = client.get_channel(987848902927605772)
+
     print(f"Ready to use as {client.user}.")
     change_status.start()
 
@@ -131,22 +149,22 @@ async def deletefav(interaction: discord.Interaction, thing: str):
 
                 for i in range(0, len(datafile_lines)):
                     # if this line is not the target deletion line, and its before the second to last entry
-                    if not datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines)-3:
+                    if not datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines) - 3:
                         temp.write(datafile_lines[i])
                         continue
                     # if this line is the target line and its not the last or penultimate line, exclude it
                     # and copy rest of file as is
-                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines)-3:
-                        for j in range(i+1, len(datafile_lines)):
+                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i < len(datafile_lines) - 3:
+                        for j in range(i + 1, len(datafile_lines)):
                             temp.write(datafile_lines[j])
                         break
                     # if line is the literal last line of file ( just a closing curly brace), copy that over
-                    if i == len(datafile_lines)-1:
+                    if i == len(datafile_lines) - 1:
                         temp.write("}")
                     # if this line is target line and is also penultimate line, write the last line instead
                     # and add a curly brace line at the end
-                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i == len(datafile_lines)-3:
-                        temp.write(datafile_lines[i+1])
+                    if datafile_lines[i].startswith(f"    \"{thing}\":") and i == len(datafile_lines) - 3:
+                        temp.write(datafile_lines[i + 1])
                         temp.write("}")
                         break
                     # if this line is target line and is also last line, write the penultimate line instead
@@ -394,18 +412,72 @@ async def help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
 
+@app_commands.choices(state=[Choice(name="Off", value="off"), Choice(name="On", value="on")])
+@client.tree.command(name="toggleled", description="placeholder test command to toggle led lamp on baid desk")
+async def toggleled(interaction: discord.Interaction, state: str):
+    # Allow baidbot time to think
+    await interaction.response.defer()
+    Port = 26935
+    # create socket s
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((socket.gethostname(), Port))
+        # time allowed until timeout (seconds)
+        s.settimeout(10)
+        s.listen(1)
+        IP = socket.gethostbyname(socket.gethostname())
+        print("Server started at " + IP + " on port " + str(Port))
+        # try to connect to baid's pc
+        try:
+            (conn, addr) = s.accept()
+        except:
+            s.close()
+            await interaction.followup.send(
+                "Connection attempt timed out \(10 seconds\). baid's pc is probably off, or I am broken")
+            return
+    # If connection succeeds, send on/off state to baid's pc script
+    with conn:
+        print('Connected by', addr)
+        conn.send((state + "\r").encode())  # send message
+        conn.close()
+    await interaction.followup.send(state + " signal sent successfully")
+
+
 # On message...
 @client.event
 async def on_message(message):
+    # if message is from baidbot, ignore all other if statements
     if message.author == client.user:
         return
+
+    # convert message to all lowercase
     message.content = message.content.lower()
+
+    # hello
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
         await message.channel.send(f"Hi <@{message.author.id}>! :heart:")
 
+    # who asked
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
+
+    # Forward all text messages in the three voice channels to a single text channel
+    if message.channel == voiceChat1 or message.channel == voiceChat2 or message.channel == voiceChat3:
+
+        # embed message
+        embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
+        embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
+                                 icon_url=message.author.avatar)
+
+        # If message has any attachments, attach the first one to embed
+        if message.attachments:
+            embed_message.set_image(url=message.attachments[0])
+        # If has content, send content
+        if message.content:
+            embed_message.add_field(name="", value=message.content, inline=False)
+
+        await muteChat.send(embed=embed_message)
 
 
 client.run(BotToken)
