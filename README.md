@@ -33,7 +33,7 @@ Folden's favorites data is synchronized between all servers the bot is in. Any e
 
 **/findemptyfavs**
 
-- *List all favorites categories which are empty *
+- *List all favorites categories which are empty*
 - Returns a list of all favorites categories which are marked as "None". Foldenpaper will need to use /updatefav to populate these entries.
 
 ## **Meme:**
