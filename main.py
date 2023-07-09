@@ -5,6 +5,10 @@ import json
 import os
 import textwrap
 
+# display_image()
+import re
+import numpy as np
+
 # to communicate with baid's arduino
 import socket
 
@@ -17,8 +21,6 @@ from itertools import cycle
 import discord
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
-from discord import app_commands
-from discord.app_commands import Choice
 
 from DiscordBotToken import BotToken
 
@@ -342,7 +344,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
 async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
-    if "image" in image.content_type:
+    if "image" in image.content_type and 'gif' not in image.content_type:
         await interaction.response.defer()
         await image.save("speechmemetemp.png")
         speech_template = Image.open("speechmemetemp.png")
@@ -412,43 +414,93 @@ async def help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
 
-@app_commands.choices(state=[Choice(name="Off", value="off"), Choice(name="On", value="on")])
-@client.tree.command(name="toggleled", description="placeholder test command to toggle led lamp on baid desk")
-async def toggleled(interaction: discord.Interaction, state: str):
-    # Allow baidbot time to think
-    await interaction.response.defer()
-    Port = 26935
-    # create socket s
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((socket.gethostname(), Port))
-        # time allowed until timeout (seconds)
-        s.settimeout(10)
-        s.listen(1)
-        IP = socket.gethostbyname(socket.gethostname())
-        print("Server started at " + IP + " on port " + str(Port))
-        # try to connect to baid's pc
-        try:
-            (conn, addr) = s.accept()
-        except:
-            s.close()
+@client.tree.command(name="display_image", description="Send an image to display on baid's PC display")
+async def display_image(interaction: discord.Interaction, image: discord.Attachment):
+    if 'image' in image.content_type:
+        # Allow baidbot time to think
+        await interaction.response.defer()
+        Port = 26935
+        max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
+        # create socket s
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((socket.gethostname(), Port))
+            # time allowed until timeout (seconds)
+            s.settimeout(10)
+            s.listen(1)
+            IP = socket.gethostbyname(socket.gethostname())
+            print("Server started at " + IP + " on port " + str(Port))
+            # try to connect to baid's pc
+            try:
+                (conn, addr) = s.accept()
+            except:
+                s.close()
+                await interaction.followup.send(
+                    "Connection attempt timed out \(10 seconds\). I may be busy processing another image request, or baid's PC is off")
+                return
+        # If connection succeeds, encode image and send to baid's pc
+        # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
+        # to a maximum of 320x160px
+        await image.save("tempImage.png")
+
+        with Image.open("tempImage.png") as msg_image:
+            msg_image = msg_image.rotate(angle=270,
+                                         expand=1)  # expand parameter allows image to be resized to fit entire rotated image (0 or 1)
+            msg_image.thumbnail((240, 360))  # resizes image with a max of (width x height)
+            msg_image.save("tempImage.png")
+
+        out_str = ""
+
+        #  convert image to byte array
+        img_data = np.fromfile("tempImage.png", dtype='uint8')
+        img_data = bytearray(img_data)
+
+        array_content = ""
+        image_size = 0
+
+        #  byte array formatting, separate values with ','
+        for b in img_data:
+            format(b, '#04x')
+            array_content += str(b) + ","
+            image_size = image_size + 1
+
+        #  if image is too large to send, return error message
+        if image_size > max_image_size:
             await interaction.followup.send(
-                "Connection attempt timed out \(10 seconds\). baid's pc is probably off, or I am broken")
-            return
-    # If connection succeeds, send on/off state to baid's pc script
-    with conn:
-        print('Connected by', addr)
-        conn.send((state + "\r").encode())  # send message
-        conn.close()
-    await interaction.followup.send(state + " signal sent successfully")
+                f"Converted image is too large! ({image_size} bytes > {max_image_size} maximum bytes)")
+            conn.close()
+        else:
+            #  send image data
+            with conn:
+                print('Connected by', addr)
+                conn.sendall(array_content.encode())  # send message
+                conn.close()
+            await interaction.followup.send("Image sent successfully, please allow up to 30 seconds for processing")
+    else:
+        await interaction.response.send_message("File must be an image!")
+
+    # On message...
 
 
-# On message...
 @client.event
 async def on_message(message):
     # if message is from baidbot, ignore all other if statements
     if message.author == client.user:
         return
+
+    # Forward all text messages in the three voice channels to a single text channel
+    if message.channel == voiceChat1 or message.channel == voiceChat2 or message.channel == voiceChat3:
+        # embed message
+        embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
+        embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
+                                 icon_url=message.author.avatar)
+        # If message has any attachments, attach the first one to embed
+        if message.attachments:
+            embed_message.set_image(url=message.attachments[0])
+        # If has content, send content
+        if message.content:
+            embed_message.add_field(name="", value=message.content, inline=False)
+        await muteChat.send(embed=embed_message)
 
     # convert message to all lowercase
     message.content = message.content.lower()
@@ -462,22 +514,9 @@ async def on_message(message):
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
-    # Forward all text messages in the three voice channels to a single text channel
-    if message.channel == voiceChat1 or message.channel == voiceChat2 or message.channel == voiceChat3:
-
-        # embed message
-        embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
-        embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
-                                 icon_url=message.author.avatar)
-
-        # If message has any attachments, attach the first one to embed
-        if message.attachments:
-            embed_message.set_image(url=message.attachments[0])
-        # If has content, send content
-        if message.content:
-            embed_message.add_field(name="", value=message.content, inline=False)
-
-        await muteChat.send(embed=embed_message)
+    if "cum" in message.content.lower():
+        emoji = '🤨'
+        await message.add_reaction(emoji)
 
 
 client.run(BotToken)
