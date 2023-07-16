@@ -66,3 +66,7 @@ Folden's favorites data is synchronized between all servers the bot is in. Any e
 **/help** 
 
 - *List command help*
+
+**/toggleled** 
+
+- *Toggles IRL desklamp on baid's desk (only while pc is running)*
