@@ -9,8 +9,8 @@ import textwrap
 import re
 import numpy as np
 
-# to communicate with baid's arduino
-import socket
+# for LCD
+import serial
 
 # For insurance reminder
 import asyncio
@@ -40,12 +40,9 @@ voiceChat1 = None
 voiceChat2 = None
 voiceChat3 = None
 
-conn = socket.socket()  # connection socket placeholder
-led_state = 0
-
 # cycle activity status
 bot_status = cycle(
-    ["with fire"])
+    ["Now with 100% less online-hosting"])
 
 
 @tasks.loop(seconds=300)
@@ -414,31 +411,15 @@ async def help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
 
-@client.tree.command(name="display_image", description="Send an image to display on baid's PC display")
+@client.tree.command(name="display_image",
+                     description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
-    if 'image' in image.content_type:
-        # Allow baidbot time to think
-        await interaction.response.defer()
-        Port = 26935
+    # defer allows discord to wait for a response longer than 3 seconds
+    await interaction.response.defer()
+    if 'image' in image.content_type and 'gif' not in image.content_type:
+
         max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
-        # create socket s
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((socket.gethostname(), Port))
-            # time allowed until timeout (seconds)
-            s.settimeout(10)
-            s.listen(1)
-            IP = socket.gethostbyname(socket.gethostname())
-            print("Server started at " + IP + " on port " + str(Port))
-            # try to connect to baid's pc
-            try:
-                (conn, addr) = s.accept()
-            except:
-                s.close()
-                await interaction.followup.send(
-                    "Connection attempt timed out \(10 seconds\). I may be busy processing another image request, or baid's PC is off")
-                return
-        # If connection succeeds, encode image and send to baid's pc
+
         # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
         # to a maximum of 320x160px
         await image.save("tempImage.png")
@@ -464,18 +445,46 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
             array_content += str(b) + ","
             image_size = image_size + 1
 
+        array_content = array_content[:-1]  # remove last comma
         #  if image is too large to send, return error message
         if image_size > max_image_size:
             await interaction.followup.send(
                 f"Converted image is too large! ({image_size} bytes > {max_image_size} maximum bytes)")
-            conn.close()
         else:
             #  send image data
-            with conn:
-                print('Connected by', addr)
-                conn.sendall(array_content.encode())  # send message
-                conn.close()
-            await interaction.followup.send("Image sent successfully, please allow up to 30 seconds for processing")
+            if __name__ == '__main__':
+                link = serial.Serial(
+                    port="/dev/ttyUSB0",  # Replace with the appropriate port
+                    baudrate=115200,  # Set the baud rate
+                    parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
+                    stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
+                    bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
+                    timeout=5,  # Set timeout value in seconds
+                    xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
+                    rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
+                )
+                link.setRTS(False)
+                link.setDTR(False)
+                out_pkg = "<"  # start of data flag
+                out_pkg += str(image_size)
+
+                out_pkg += ","
+
+                count = 0
+                for i in array_content:
+                    out_pkg += str(i)
+                    count += 1
+
+                    if count % 1024 == 0:
+                        print(out_pkg)
+                        link.write(out_pkg.encode())  # send out_pkg as bytes
+                        out_pkg = ""
+
+                out_pkg += ">"  # end of data flag
+
+                link.write(out_pkg.encode())  # send out_pkg as bytes
+                link.close()
+                await interaction.followup.send("Image sent successfully")
     else:
         await interaction.response.send_message("File must be an image!")
 
