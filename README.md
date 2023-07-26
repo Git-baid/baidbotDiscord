@@ -1,4 +1,5 @@
 # Hello baidbot!
+![](https://github.com/Git-baid/Microwave-PC-LCD/blob/main/baidbot800x.jpg)
 A bot for Discord that provides specific utility to a select few servers
 
 ## 🤖 Features:
@@ -6,6 +7,8 @@ A bot for Discord that provides specific utility to a select few servers
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/findfavDemonstration.gif)
 - **Modify input images/gifs to add text or a preset speechbubble as a reaction image**
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/memeDemonstration.gif)
+- **Display an image on baid's [Microwave PC Display]()**
+![](https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20230725_235057.jpg)
 - **Miscellaneous features such as an insurance timer for Tarkov, return bot ping, and /help**
 
 # Command Help:
