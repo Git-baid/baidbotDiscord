@@ -70,6 +70,10 @@ Folden's favorites data is synchronized between all servers the bot is in. Any e
 
 - *List command help*
 
-**/toggleled** 
+**/Display_Image**
 
-- *Toggles IRL desklamp on baid's desk (only while pc is running)*
+- Displays an image on baid's Microwave PC display. Does not require baid's PC to be on.
+
+~~**/toggleled**~~ *Removed*
+
+~~- *Toggles IRL desklamp on baid's desk (only while pc is running)*~~
