@@ -1,5 +1,5 @@
 # Hello baidbot!
-![](https://github.com/Git-baid/Microwave-PC-LCD/blob/main/baidbot800x.png)
+<img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/baidbot800x.png" width="320">
 A bot for Discord that provides utility to a select few servers
 
 ## 🤖 Features:
