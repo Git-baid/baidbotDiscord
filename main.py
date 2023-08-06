@@ -40,6 +40,7 @@ voiceChat1 = None
 voiceChat2 = None
 voiceChat3 = None
 
+
 # cycle activity status
 bot_status = cycle(
     ["Now with 100% less online-hosting"])
@@ -60,9 +61,11 @@ async def on_ready():
     voiceChat1 = client.get_channel(987848902927605770)
     voiceChat2 = client.get_channel(987848902927605771)
     voiceChat3 = client.get_channel(987848902927605772)
+    
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
 
     print(f"Ready to use as {client.user}.")
-    change_status.start()
+    # change_status.start()
 
 
 # Ping command
@@ -291,6 +294,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         # download the attached GIF
         await gif_file.save("input.gif")
         giftemplate = Image.open("input.gif")
+        gif_loop = giftemplate.info['loop']
         font_size = int(giftemplate.width / 10)
         font = ImageFont.truetype("Futura Condensed Extra Bold Regular.ttf", font_size)
         text_color = (0, 0, 0)  # black
@@ -332,7 +336,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
             temp.save(b, format="GIF")
             temp = Image.open(b)
             frames.append(temp)
-        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=giftemplate.info['loop'],
+        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=gif_loop,
                        duration=total_duration / len(frames))
         await interaction.followup.send(file=discord.File("meme_out.gif"))
     else:
@@ -341,8 +345,8 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
 async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
+    await interaction.response.defer()
     if "image" in image.content_type and 'gif' not in image.content_type:
-        await interaction.response.defer()
         await image.save("speechmemetemp.png")
         speech_template = Image.open("speechmemetemp.png")
         speech_bubble = Image.open("SBOverlay.png")
@@ -411,24 +415,25 @@ async def help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
 
-@client.tree.command(name="display_image",
-                     description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
+@client.tree.command(name="display_image", description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
     # defer allows discord to wait for a response longer than 3 seconds
     await interaction.response.defer()
     if 'image' in image.content_type and 'gif' not in image.content_type:
-
+        
         max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
+		
+        try:
+            # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
+            # to a maximum of 320x160px
+            await image.save("tempImage.jpg")
 
-        # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
-        # to a maximum of 320x160px
-        await image.save("tempImage.png")
-
-        with Image.open("tempImage.png") as msg_image:
-            msg_image = msg_image.rotate(angle=270,
-                                         expand=1)  # expand parameter allows image to be resized to fit entire rotated image (0 or 1)
-            msg_image.thumbnail((240, 360))  # resizes image with a max of (width x height)
-            msg_image.save("tempImage.png")
+            with Image.open("tempImage.jpg") as msg_image:
+                msg_image.thumbnail((320, 160))  # resizes image with a max of (width x height)
+                msg_image.save("tempImage.png",optimize=True)
+        except:
+            await interaction.followup.send(
+                "Error resizing or saving image")
 
         out_str = ""
 
@@ -453,21 +458,25 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         else:
             #  send image data
             if __name__ == '__main__':
-                link = serial.Serial(
-                    port="/dev/ttyUSB0",  # Replace with the appropriate port
-                    baudrate=115200,  # Set the baud rate
-                    parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
-                    stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
-                    bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
-                    timeout=5,  # Set timeout value in seconds
-                    xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
-                    rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
-                )
-                link.setRTS(False)
-                link.setDTR(False)
+                try:
+                    link = serial.Serial(
+                        port="/dev/ttyUSB0",  # Replace with the appropriate port
+                        baudrate=115200,  # Set the baud rate
+                        parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
+                        stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
+                        bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
+                        timeout=5,  # Set timeout value in seconds
+                        xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
+                        rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
+                    )
+                    link.setRTS(False)
+                    link.setDTR(False)
+                except:
+                    await interaction.followup.send(
+                "USB Serial Connection Error to ESP32 <@116734104300421122>")
                 out_pkg = "<"  # start of data flag
                 out_pkg += str(image_size)
-
+                
                 out_pkg += ","
 
                 count = 0
@@ -489,8 +498,6 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         await interaction.response.send_message("File must be an image!")
 
     # On message...
-
-
 @client.event
 async def on_message(message):
     # if message is from baidbot, ignore all other if statements
@@ -524,8 +531,8 @@ async def on_message(message):
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
     if "cum" in message.content.lower():
-        emoji = '🤨'
+        emoji = '>('
         await message.add_reaction(emoji)
 
 
-client.run(BotToken)
+client.run(BotToken) 
