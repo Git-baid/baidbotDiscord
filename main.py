@@ -411,6 +411,7 @@ async def help(interaction: discord.Interaction):
                             value="**/insurance** - Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
                                   "\n**/ping** - Returns bot latency"
                                   "\n**/help** - List command help"
+                                  "\n**/display_image** - Sends an attached image to display on baid's microwave PC display"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
@@ -418,7 +419,7 @@ async def help(interaction: discord.Interaction):
 @client.tree.command(name="display_image", description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
     # defer allows discord to wait for a response longer than 3 seconds
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral = True)
     if 'image' in image.content_type and 'gif' not in image.content_type:
         
         max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
@@ -473,7 +474,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                     link.setDTR(False)
                 except:
                     await interaction.followup.send(
-                "USB Serial Connection Error to ESP32 <@116734104300421122>")
+                "USB Serial Connection Error to ESP32, baid probably has it unplugged")
                 out_pkg = "<"  # start of data flag
                 out_pkg += str(image_size)
                 
@@ -495,7 +496,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                 link.close()
                 await interaction.followup.send("Image sent successfully")
     else:
-        await interaction.response.send_message("File must be an image!")
+        await interaction.followup.send("File must be an image!")
 
     # On message...
 @client.event
