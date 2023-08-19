@@ -395,23 +395,23 @@ async def help(interaction: discord.Interaction):
     embed_message = discord.Embed(title="Command Help", color=discord.Color.orange())
     embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
     embed_message.set_thumbnail(url=client.user.avatar)
-    embed_message.add_field(name="**Folden favorites:---------------------------**",
-                            value="**/findfav** - Find folden's favorite everything"
-                                  "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
-                                  "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
-                                  "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
-                                  "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav)"
+    embed_message.add_field(name="**Folden favorites**",
+                            value="`/findfav` \n- Find folden's favorite everything"
+                                  "\n`/addfav` \n- Add a new category to favorites (Folden will need to use /updatefav)"
+                                  "\n`/updatefav` \n- Update a category's favorite item (Can only be executed by Foldenpaper)"
+                                  "\n`/deletefav` \n- Delete a favorite category (Can only be executed by Foldenpaper)"
+                                  "\n`/findemptyfavs` \n- List all favorites categories which are empty (Folden will need to update with /updatefav)"
                             , inline=False)
-    embed_message.add_field(name="**Meme:---------------------------**",
-                            value="**/meme** - Add top text and/or bottom text to an image in the classic style"
-                                  "\n**/gifmeme** - Add text above a gif in a margin in the classic meme gif style"
-                                  "\n**/speechbubble** - Add a speech bubble to the top of your image for meme responses"
+    embed_message.add_field(name="**Meme**",
+                            value="`/meme` \n- Add top text and/or bottom text to an image in the classic style"
+                                  "\n`/gifmeme` \n- Add text above a gif in a margin in the classic meme gif style"
+                                  "\n`/speechbubble` \n- Add a speech bubble to the top of your image for meme responses"
                             , inline=False)
-    embed_message.add_field(name="**Misc:---------------------------**",
-                            value="**/insurance** - Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
-                                  "\n**/ping** - Returns bot latency"
-                                  "\n**/help** - List command help"
-                                  "\n**/display_image** - Sends an attached image to display on baid's microwave PC display"
+    embed_message.add_field(name="**Misc**",
+                            value="`/insurance` \n- Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
+                                  "\n`/ping` \n- Returns bot latency"
+                                  "\n`/help` \n- List command help"
+                                  "\n`/display_image` \n- Sends an attached image to display on baid's microwave PC display"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
