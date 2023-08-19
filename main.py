@@ -532,7 +532,7 @@ async def on_message(message):
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
     if "cum" in message.content.lower():
-        emoji = '>('
+        emoji = '\N{Face with One Eyebrow Raised}'
         await message.add_reaction(emoji)
 
 
