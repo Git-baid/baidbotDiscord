@@ -424,8 +424,6 @@ async def jar(interaction: discord.Interaction):
     author_count = data.get(str(author), "zero")
     sortedlist = sorted(data.items(), key=lambda x: x[1], reverse=True)
 
-    print(sortedlist)
-
     for i in range(0, len(sortedlist)):
         if str(author) == sortedlist[i][0]:
             author_place = i + 1
