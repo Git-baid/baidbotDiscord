@@ -1,11 +1,14 @@
 # Hello baidbot!
-A bot for Discord that provides specific utility to a select few servers
+<img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/baidbot800x.png" width="320">
+A bot for Discord that provides utility to a select few servers
 
 ## 🤖 Features:
 - **Manipulate data on a specific user's favorite everything using CRUD operations**
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/findfavDemonstration.gif)
 - **Modify input images/gifs to add text or a preset speechbubble as a reaction image**
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/memeDemonstration.gif)
+- **Display an image on baid's [Microwave PC Display](https://github.com/Git-baid/Microwave-PC-LCD/tree/main)**
+![](https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20230725_235057.jpg)
 - **Miscellaneous features such as an insurance timer for Tarkov, return bot ping, and /help**
 
 # Command Help:
@@ -67,6 +70,10 @@ Folden's favorites data is synchronized between all servers the bot is in. Any e
 
 - *List command help*
 
-**/toggleled** 
+**/Display_Image**
 
-- *Toggles IRL desklamp on baid's desk (only while pc is running)*
+- Displays an image on baid's Microwave PC display. Does not require baid's PC to be on.
+
+~~**/toggleled**~~ *Removed*
+
+~~- *Toggles IRL desklamp on baid's desk (only while pc is running)*~~
