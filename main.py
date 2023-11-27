@@ -1,5 +1,4 @@
 # data in data.json is community generated and unmoderated
-
 from io import BytesIO
 import json
 import os
@@ -23,6 +22,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
 
 from DiscordBotToken import BotToken
+from word import word
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -61,8 +61,10 @@ async def on_ready():
     voiceChat2 = client.get_channel(987848902927605771)
     voiceChat3 = client.get_channel(987848902927605772)
 
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
+
     print(f"Ready to use as {client.user}.")
-    change_status.start()
+    # change_status.start()
 
 
 # Ping command
@@ -291,6 +293,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         # download the attached GIF
         await gif_file.save("input.gif")
         giftemplate = Image.open("input.gif")
+        gif_loop = giftemplate.info['loop']
         font_size = int(giftemplate.width / 10)
         font = ImageFont.truetype("Futura Condensed Extra Bold Regular.ttf", font_size)
         text_color = (0, 0, 0)  # black
@@ -332,7 +335,7 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
             temp.save(b, format="GIF")
             temp = Image.open(b)
             frames.append(temp)
-        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=giftemplate.info['loop'],
+        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=gif_loop,
                        duration=total_duration / len(frames))
         await interaction.followup.send(file=discord.File("meme_out.gif"))
     else:
@@ -341,8 +344,8 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
 async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
+    await interaction.response.defer()
     if "image" in image.content_type and 'gif' not in image.content_type:
-        await interaction.response.defer()
         await image.save("speechmemetemp.png")
         speech_template = Image.open("speechmemetemp.png")
         speech_bubble = Image.open("SBOverlay.png")
@@ -391,44 +394,75 @@ async def help(interaction: discord.Interaction):
     embed_message = discord.Embed(title="Command Help", color=discord.Color.orange())
     embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
     embed_message.set_thumbnail(url=client.user.avatar)
-    embed_message.add_field(name="**Folden favorites:---------------------------**",
-                            value="**/findfav** - Find folden's favorite everything"
-                                  "\n**/addfav** - Add a new category to favorites (Folden will need to use /updatefav)"
-                                  "\n**/updatefav** - Update a category's favorite item (Can only be executed by Foldenpaper)"
-                                  "\n**/deletefav** - Delete a favorite category (Can only be executed by Foldenpaper)"
-                                  "\n**/findemptyfavs** - List all favorites categories which are empty (Folden will need to update with /updatefav)"
+    embed_message.add_field(name="**Folden favorites**",
+                            value="`/findfav` \n- Find folden's favorite everything"
+                                  "\n`/addfav` \n- Add a new category to favorites (Folden will need to use /updatefav)"
+                                  "\n`/updatefav` \n- Update a category's favorite item (Can only be executed by Foldenpaper)"
+                                  "\n`/deletefav` \n- Delete a favorite category (Can only be executed by Foldenpaper)"
+                                  "\n`/findemptyfavs` \n- List all favorites categories which are empty (Folden will need to update with /updatefav)"
                             , inline=False)
-    embed_message.add_field(name="**Meme:---------------------------**",
-                            value="**/meme** - Add top text and/or bottom text to an image in the classic style"
-                                  "\n**/gifmeme** - Add text above a gif in a margin in the classic meme gif style"
-                                  "\n**/speechbubble** - Add a speech bubble to the top of your image for meme responses"
+    embed_message.add_field(name="**Meme**",
+                            value="`/meme` \n- Add top text and/or bottom text to an image in the classic style"
+                                  "\n`/gifmeme` \n- Add text above a gif in a margin in the classic meme gif style"
+                                  "\n`/speechbubble` \n- Add a speech bubble to the top of your image for meme responses"
                             , inline=False)
-    embed_message.add_field(name="**Misc:---------------------------**",
-                            value="**/insurance** - Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
-                                  "\n**/ping** - Returns bot latency"
-                                  "\n**/help** - List command help"
+    embed_message.add_field(name="**Misc**",
+                            value="`/insurance` \n- Used for Tarkov players to get notified when their insurance is ready to claim (from Prapor)"
+                                  "\n`/ping` \n- Returns bot latency"
+                                  "\n`/help` \n- List command help"
+                                  "\n`/display_image` \n- Sends an attached image to display on baid's microwave PC display"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
+@client.tree.command(name="jar", description=f"{word} leaderboard")
+async def jar(interaction: discord.Interaction):
+    data = {}
+    with open("ccounter.json", 'r') as f:
+        data = json.load(f)
+    author = interaction.user.id
+    author_place = -1
+    author_count = data.get(str(author), "zero")
+    sortedlist = sorted(data.items(), key=lambda x: x[1], reverse=True)
+
+    print(sortedlist)
+
+    for i in range(0, len(sortedlist)):
+        if str(author) == sortedlist[i][0]:
+            author_place = i + 1
+
+
+    embed_message = discord.Embed(title=f"The Jar", color=discord.Color.from_rgb(255, 255, 255))
+    embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
+    embed_message.set_thumbnail(url="https://cdn3.emoji.gg/default/twitter/glass-of-milk.png")
+    embed_message.add_field(name=f"Top Contributors",
+                            value=f"\N{First Place Medal}<@{sortedlist[0][0]}> has busted a record {sortedlist[0][1]} times!\n"
+                                  f"\N{Second Place Medal}<@{sortedlist[1][0]}> has busted {sortedlist[1][1]} times\n"
+                                  f"\N{Third Place Medal}<@{sortedlist[2][0]}> has busted {sortedlist[2][1]} times\n"
+                                  f"...\n**{author_place})** You (<@{author}>) have busted {author_count} times"
+                            , inline=False)
+
+    await interaction.response.send_message(embed=embed_message)
 
 @client.tree.command(name="display_image",
                      description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
     # defer allows discord to wait for a response longer than 3 seconds
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
     if 'image' in image.content_type and 'gif' not in image.content_type:
 
         max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
 
-        # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
-        # to a maximum of 320x160px
-        await image.save("tempImage.png")
+        try:
+            # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
+            # to a maximum of 320x160px
+            await image.save("tempImage.jpg")
 
-        with Image.open("tempImage.png") as msg_image:
-            msg_image = msg_image.rotate(angle=270,
-                                         expand=1)  # expand parameter allows image to be resized to fit entire rotated image (0 or 1)
-            msg_image.thumbnail((240, 360))  # resizes image with a max of (width x height)
-            msg_image.save("tempImage.png")
+            with Image.open("tempImage.jpg") as msg_image:
+                msg_image.thumbnail((320, 160))  # resizes image with a max of (width x height)
+                msg_image.save("tempImage.png", optimize=True)
+        except:
+            await interaction.followup.send(
+                "Error resizing or saving image")
 
         out_str = ""
 
@@ -453,18 +487,22 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         else:
             #  send image data
             if __name__ == '__main__':
-                link = serial.Serial(
-                    port="/dev/ttyUSB0",  # Replace with the appropriate port
-                    baudrate=115200,  # Set the baud rate
-                    parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
-                    stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
-                    bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
-                    timeout=5,  # Set timeout value in seconds
-                    xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
-                    rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
-                )
-                link.setRTS(False)
-                link.setDTR(False)
+                try:
+                    link = serial.Serial(
+                        port="/dev/ttyUSB0",  # Replace with the appropriate port
+                        baudrate=115200,  # Set the baud rate
+                        parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
+                        stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
+                        bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
+                        timeout=5,  # Set timeout value in seconds
+                        xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
+                        rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
+                    )
+                    link.setRTS(False)
+                    link.setDTR(False)
+                except:
+                    await interaction.followup.send(
+                        "USB Serial Connection Error to ESP32, baid probably has it unplugged")
                 out_pkg = "<"  # start of data flag
                 out_pkg += str(image_size)
 
@@ -486,7 +524,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                 link.close()
                 await interaction.followup.send("Image sent successfully")
     else:
-        await interaction.response.send_message("File must be an image!")
+        await interaction.followup.send("File must be an image!")
 
     # On message...
 
@@ -513,6 +551,24 @@ async def on_message(message):
 
     # convert message to all lowercase
     message.content = message.content.lower()
+    ccount = 0
+    ccount += len(re.findall(r'\b' + word + r'\b', message.content))
+    ccount += len(re.findall(r'\b' + word + "ming" + r'\b', message.content))
+    ccount += len(re.findall(r'\b' + word + "my" + r'\b', message.content))
+
+    if ccount > 0:
+        data = {}
+        user = str(message.author.id)
+        with open("ccounter.json", 'r+') as f:
+            data = json.load(f)
+        if data.get(user, "failed") == "failed":
+            data[user] = ccount
+        else:
+            data[user] += ccount
+        f.close()
+        with open("ccounter.json", 'w') as f:
+            json.dump(data, f, indent=4)
+
 
     # hello
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
@@ -523,8 +579,8 @@ async def on_message(message):
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
-    if "cum" in message.content.lower():
-        emoji = '🤨'
+    if word in message.content:
+        emoji = '\N{Face with One Eyebrow Raised}'
         await message.add_reaction(emoji)
 
 
