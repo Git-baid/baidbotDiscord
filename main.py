@@ -1,5 +1,4 @@
 # data in data.json is community generated and unmoderated
-
 from io import BytesIO
 import json
 import os
@@ -23,6 +22,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
 
 from DiscordBotToken import BotToken
+from word import word
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -39,7 +39,6 @@ muteChat = None
 voiceChat1 = None
 voiceChat2 = None
 voiceChat3 = None
-
 
 # cycle activity status
 bot_status = cycle(
@@ -61,7 +60,7 @@ async def on_ready():
     voiceChat1 = client.get_channel(987848902927605770)
     voiceChat2 = client.get_channel(987848902927605771)
     voiceChat3 = client.get_channel(987848902927605772)
-    
+
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
 
     print(f"Ready to use as {client.user}.")
@@ -415,15 +414,44 @@ async def help(interaction: discord.Interaction):
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
+@client.tree.command(name="jar", description=f"{word} leaderboard")
+async def jar(interaction: discord.Interaction):
+    data = {}
+    with open("ccounter.json", 'r') as f:
+        data = json.load(f)
+    author = interaction.user.id
+    author_place = -1
+    author_count = data.get(str(author), "zero")
+    sortedlist = sorted(data.items(), key=lambda x: x[1], reverse=True)
 
-@client.tree.command(name="display_image", description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
+    print(sortedlist)
+
+    for i in range(0, len(sortedlist)):
+        if str(author) == sortedlist[i][0]:
+            author_place = i + 1
+
+
+    embed_message = discord.Embed(title=f"The Jar", color=discord.Color.from_rgb(255, 255, 255))
+    embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
+    embed_message.set_thumbnail(url="https://cdn3.emoji.gg/default/twitter/glass-of-milk.png")
+    embed_message.add_field(name=f"Top Contributors",
+                            value=f"\N{First Place Medal}<@{sortedlist[0][0]}> has busted a record {sortedlist[0][1]} times!\n"
+                                  f"\N{Second Place Medal}<@{sortedlist[1][0]}> has busted {sortedlist[1][1]} times\n"
+                                  f"\N{Third Place Medal}<@{sortedlist[2][0]}> has busted {sortedlist[2][1]} times\n"
+                                  f"...\n**{author_place})** You (<@{author}>) have busted {author_count} times"
+                            , inline=False)
+
+    await interaction.response.send_message(embed=embed_message)
+
+@client.tree.command(name="display_image",
+                     description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
     # defer allows discord to wait for a response longer than 3 seconds
-    await interaction.response.defer(ephemeral = True)
+    await interaction.response.defer(ephemeral=True)
     if 'image' in image.content_type and 'gif' not in image.content_type:
-        
+
         max_image_size = 102400  # max image size in bytes to send over socket connection, should be large enough for most images
-		
+
         try:
             # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
             # to a maximum of 320x160px
@@ -431,7 +459,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
 
             with Image.open("tempImage.jpg") as msg_image:
                 msg_image.thumbnail((320, 160))  # resizes image with a max of (width x height)
-                msg_image.save("tempImage.png",optimize=True)
+                msg_image.save("tempImage.png", optimize=True)
         except:
             await interaction.followup.send(
                 "Error resizing or saving image")
@@ -474,10 +502,10 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                     link.setDTR(False)
                 except:
                     await interaction.followup.send(
-                "USB Serial Connection Error to ESP32, baid probably has it unplugged")
+                        "USB Serial Connection Error to ESP32, baid probably has it unplugged")
                 out_pkg = "<"  # start of data flag
                 out_pkg += str(image_size)
-                
+
                 out_pkg += ","
 
                 count = 0
@@ -499,6 +527,8 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         await interaction.followup.send("File must be an image!")
 
     # On message...
+
+
 @client.event
 async def on_message(message):
     # if message is from baidbot, ignore all other if statements
@@ -521,6 +551,24 @@ async def on_message(message):
 
     # convert message to all lowercase
     message.content = message.content.lower()
+    ccount = 0
+    ccount += len(re.findall(r'\b' + word + r'\b', message.content))
+    ccount += len(re.findall(r'\b' + word + "ming" + r'\b', message.content))
+    ccount += len(re.findall(r'\b' + word + "my" + r'\b', message.content))
+
+    if ccount > 0:
+        data = {}
+        user = str(message.author.id)
+        with open("ccounter.json", 'r+') as f:
+            data = json.load(f)
+        if data.get(user, "failed") == "failed":
+            data[user] = ccount
+        else:
+            data[user] += ccount
+        f.close()
+        with open("ccounter.json", 'w') as f:
+            json.dump(data, f, indent=4)
+
 
     # hello
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
@@ -531,9 +579,9 @@ async def on_message(message):
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
 
-    if "cum" in message.content.lower():
+    if word in message.content:
         emoji = '\N{Face with One Eyebrow Raised}'
         await message.add_reaction(emoji)
 
 
-client.run(BotToken) 
+client.run(BotToken)
