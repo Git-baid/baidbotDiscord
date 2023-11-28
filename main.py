@@ -583,9 +583,8 @@ async def on_message(message):
         await message.add_reaction(emoji)
 
     # funni
-    word_list = message.content.split()
-    for word in word_list:
-        if word.endswith("er") and random.randint(1, 1000) == 1:
-            await message.channel.send(f"{word}!? I hardly know her!")
+    last_word = message.content.split()[-1]
+    if message.content.endswith("er") and random.randint(1, 500) == 1:
+        await message.channel.send(f"{last_word}!? I hardly know her!")
 
 client.run(BotToken)
