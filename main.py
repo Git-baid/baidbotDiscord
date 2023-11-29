@@ -3,6 +3,7 @@ from io import BytesIO
 import json
 import os
 import textwrap
+import random
 
 # display_image()
 import re
@@ -581,5 +582,9 @@ async def on_message(message):
         emoji = '\N{Face with One Eyebrow Raised}'
         await message.add_reaction(emoji)
 
+    # funni
+    last_word = message.content.split()[-1]
+    if message.content.endswith("er") and random.randint(1, 100) == 50:
+        await message.channel.send(f"{last_word}!? I hardly know her!")
 
 client.run(BotToken)
