@@ -16,16 +16,19 @@ import serial
 import asyncio
 import time
 
+# For Oneshot price check
 from itertools import cycle
+from steam import Steam
+
 
 import discord
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
 
-from DiscordBotToken import BotToken
+from DiscordBotToken import BotToken, SteamAPIToken
 from word import word
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.message_content = True
 client = commands.Bot(command_prefix='baidbot', intents=intents)
 FoldenID = 274705127380615179
@@ -41,14 +44,28 @@ voiceChat1 = None
 voiceChat2 = None
 voiceChat3 = None
 
+steam = Steam(SteamAPIToken)
+oneshot_id = 420530
+notified = False
+
 # cycle activity status
 bot_status = cycle(
     ["Now with 100% less online-hosting"])
 
 
-@tasks.loop(seconds=300)
+@tasks.loop(seconds=3600)
 async def change_status():
-    await client.change_presence(activity=discord.Game(next(bot_status)))
+    global notified
+
+    # oh my gah
+    oneshot_price_overview = steam.apps.get_app_details(app_id=oneshot_id, filters="price_overview"
+                                                        ).get(str(oneshot_id)).get("data").get("price_overview")
+
+    if oneshot_price_overview.get("final") < oneshot_price_overview.get("initial") and not notified:
+        notified = True
+        await client.get_user(baidID).send("Oneshot is on sale for " + oneshot_price_overview.get("final_formatted"))
+    else:
+        notified = False
 
 
 @client.event
@@ -65,7 +82,7 @@ async def on_ready():
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
 
     print(f"Ready to use as {client.user}.")
-    # change_status.start()
+    change_status.start()
 
 
 # Ping command
@@ -586,5 +603,9 @@ async def on_message(message):
     last_word = message.content.split()[-1]
     if message.content.endswith("er") and random.randint(1, 500) == 1:
         await message.channel.send(f"{last_word}!? I hardly know her!")
+
+    # twitter
+    # if message.content.startswith("https://twitter.com/"):
+    #    await message.channel.send(f"https://vxtwitter.com/" + message.content[20:])
 
 client.run(BotToken)
