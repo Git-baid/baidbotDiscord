@@ -9,8 +9,9 @@ A multi-functional bot for Discord that provides utility to myself and a couple 
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/memeDemonstration.gif)
 - **Display an image on baid's [Microwave PC Display](https://github.com/Git-baid/Microwave-PC-LCD/tree/main)**
 <img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20230725_235057.jpg" width="300">
-- **Notifies me when select Steam games go on sale**
+
 - **Miscellaneous features such as an insurance timer for Tarkov, return bot ping, and /help**
+
 
 # Command Help:
 ## **Folden favorites:**
