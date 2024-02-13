@@ -1,6 +1,6 @@
 # Hello baidbot!
 <img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/baidbot800x.png" width="320">
-A bot for Discord that provides utility to a select few servers
+A multi-functional bot for Discord that provides utility to myself and a couple of Discord servers
 
 ## 🤖 Features:
 - **Manipulate data on a specific user's favorite everything using CRUD operations**
@@ -11,6 +11,7 @@ A bot for Discord that provides utility to a select few servers
 <img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20230725_235057.jpg" width="300">
 
 - **Miscellaneous features such as an insurance timer for Tarkov, return bot ping, and /help**
+
 
 # Command Help:
 ## **Folden favorites:**
