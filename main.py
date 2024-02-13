@@ -64,8 +64,9 @@ async def change_status():
     if oneshot_price_overview.get("final") < oneshot_price_overview.get("initial") and not notified:
         notified = True
         await client.get_user(baidID).send("Oneshot is on sale for " + oneshot_price_overview.get("final_formatted"))
-    else:
+    elif oneshot_price_overview.get("final") == oneshot_price_overview.get("initial"):
         notified = False
+        await client.get_user(baidID).send("Oneshot is no longer on sale")
 
 
 @client.event
