@@ -34,7 +34,7 @@ client = commands.Bot(command_prefix='baidbot', intents=intents)
 FoldenID = 274705127380615179
 baidID = 116734104300421122  # testing purposes
 MeiMeiID = 1001538703296057455
-baidcologyID = 987848902315245598
+serveroffriendsID = 987848902315245598
 baidbotdevserverID = 1072108038577725551
 # maximum response file size without compression
 maxFileSize = 25000000
@@ -75,7 +75,7 @@ async def on_ready():
     muteChat = client.get_channel(987848902642384945)
     #get all voice channels
     for channel in client.get_all_channels(): 
-        if channel.guild.id == baidcologyID:
+        if channel.guild.id == serveroffriendsID:
             if str(channel.type) == 'voice':
                 voice_channel_list.append(channel.id)
 
@@ -91,13 +91,13 @@ async def on_ready():
 #add new voice channels
 @client.event
 async def on_guild_channel_create(channel):
-    if channel.guild.id == baidcologyID and str(channel.type) == 'voice':
+    if channel.guild.id == serveroffriendsID and str(channel.type) == 'voice':
         voice_channel_list.append(channel.id)
 #remove deleted voice channels
 @client.event
 async def on_guild_channel_delete(channel):
     for guild in client.guilds:
-        if guild.id == baidcologyID and str(channel.type) == 'voice': 
+        if guild.id == serveroffriendsID and str(channel.type) == 'voice': 
             voice_channel_list.remove(channel.id)
 
 
