@@ -34,15 +34,13 @@ client = commands.Bot(command_prefix='baidbot', intents=intents)
 FoldenID = 274705127380615179
 baidID = 116734104300421122  # testing purposes
 MeiMeiID = 1001538703296057455
-baidcologyID = 987848902315245598
+serveroffriendsID = 987848902315245598
 baidbotdevserverID = 1072108038577725551
 # maximum response file size without compression
 maxFileSize = 25000000
 # ID of voice channels in baidcology discord for text chat migration
 muteChat = None
-voiceChat1 = None
-voiceChat2 = None
-voiceChat3 = None
+voice_channel_list=[]
 
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
@@ -73,17 +71,40 @@ async def change_status():
 async def on_ready():
     await client.tree.sync()
     await client.tree.sync(guild=discord.Object(id=baidbotdevserverID))
-    global muteChat, voiceChat1, voiceChat2, voiceChat3
+    global muteChat, voice_channel_list
 
     muteChat = client.get_channel(987848902642384945)
-    voiceChat1 = client.get_channel(987848902927605770)
-    voiceChat2 = client.get_channel(987848902927605771)
-    voiceChat3 = client.get_channel(987848902927605772)
+    #get all voice channels
+    for channel in client.get_all_channels(): 
+        if channel.guild.id == serveroffriendsID:
+            if str(channel.type) == 'voice':
+                voice_channel_list.append(channel.id)
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
 
     print(f"Ready to use as {client.user}.")
     change_status.start()
+
+
+
+
+
+#add new voice channels
+@client.event
+async def on_guild_channel_create(channel):
+    if channel.guild.id == serveroffriendsID and str(channel.type) == 'voice':
+        voice_channel_list.append(channel.id)
+#remove deleted voice channels
+@client.event
+async def on_guild_channel_delete(channel):
+    for guild in client.guilds:
+        if guild.id == serveroffriendsID and str(channel.type) == 'voice': 
+            voice_channel_list.remove(channel.id)
+
+
+
+
+
 
 
 # Ping command
@@ -552,8 +573,8 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # Forward all text messages in the three voice channels to a single text channel
-    if message.channel == voiceChat1 or message.channel == voiceChat2 or message.channel == voiceChat3:
+    # Forward all text messages in voice channels to a single text channel
+    if message.channel in voice_channel_list:
         # embed message
         embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
         embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
