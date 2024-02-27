@@ -20,7 +20,6 @@ import time
 from itertools import cycle
 from steam import Steam
 
-
 import discord
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
@@ -86,25 +85,19 @@ async def on_ready():
     change_status.start()
 
 
-
-
-
 #add new voice channels
 @client.event
 async def on_guild_channel_create(channel):
     if channel.guild.id == serveroffriendsID and str(channel.type) == 'voice':
         voice_channel_list.append(channel.id)
+
+
 #remove deleted voice channels
 @client.event
 async def on_guild_channel_delete(channel):
     for guild in client.guilds:
         if guild.id == serveroffriendsID and str(channel.type) == 'voice': 
             voice_channel_list.remove(channel.id)
-
-
-
-
-
 
 
 # Ping command
@@ -574,7 +567,7 @@ async def on_message(message):
         return
 
     # Forward all text messages in voice channels to a single text channel
-    if message.channel in voice_channel_list:
+    if message.channel.id in voice_channel_list:
         # embed message
         embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
         embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
