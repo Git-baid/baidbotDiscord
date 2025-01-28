@@ -4,6 +4,7 @@ import json
 import os
 import textwrap
 import random
+from pathlib import Path
 
 # display_image()
 import re
@@ -18,14 +19,18 @@ import time
 
 # For Oneshot price check
 from itertools import cycle
-from steam import Steam
+from steam_web_api import Steam
 
 import discord
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
 from discord.ext import commands, tasks
 
-from DiscordBotToken import BotToken, SteamAPIToken
+from BotTokens import BotToken, SteamAPIToken
 from word import word
+
+# Root directory for this script, used for referencing files in same
+ROOT_DIR = Path(__file__).parent
+FAV_DATA_PATH = ROOT_DIR / 'data.json'
 
 intents = discord.Intents.all()
 intents.message_content = True
@@ -40,6 +45,7 @@ maxFileSize = 25000000
 # ID of voice channels in baidcology discord for text chat migration
 muteChat = None
 voice_channel_list=[]
+hardly_know_chance = 0.005
 
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
@@ -111,7 +117,7 @@ async def ping(interaction: discord.Interaction):
 @client.tree.command(name="findfav", description="Finds folden's favorite everything")
 async def findfav(interaction: discord.Interaction, item: str):
     data = {}
-    with open("data.json", "r") as f:
+    with open(FAV_DATA_PATH, "r") as f:
         data = json.load(f)
     await interaction.response.send_message(
         f"Folden's favorite {item} is {data.get(item, 'not found. Consider using /addfav to query Foldenpaper')}.")
@@ -121,7 +127,7 @@ async def findfav(interaction: discord.Interaction, item: str):
 @client.tree.command(name="addfav", description="Add a new thing to favorites list")
 async def addfav(interaction: discord.Interaction, item: str):
     data = {}
-    with open("data.json", "r") as fr:
+    with open(FAV_DATA_PATH, "r") as fr:
         data = json.load(fr)
         fr.close()
         item = item.lower()
@@ -153,7 +159,7 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
         # if favorite is NOT a URL or exception greek letter, convert to lowercase.
         if not favorite.startswith("http") and thing != "greek letter":
             favorite = favorite.lower()
-        with open("data.json", "r+") as f:
+        with open(FAV_DATA_PATH, "r+") as f:
             data = json.load(f)
             # Check if thing exists, if not, send fail message
             if data.get(thing, "failed") == "failed":
@@ -164,7 +170,7 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
                 prev_fav = data.get(thing)
                 data[thing] = favorite
                 f.close()
-                with open("data.json", 'w') as f:
+                with open(FAV_DATA_PATH, 'w') as f:
                     json.dump(data, f, indent=4)
                 await interaction.response.send_message(f"Updated favorite {thing} to {favorite} from {prev_fav}")
     else:
@@ -177,8 +183,8 @@ async def updatefav(interaction: discord.Interaction, thing: str, favorite: str)
 async def deletefav(interaction: discord.Interaction, thing: str):
     if (interaction.user.id == FoldenID or interaction.user.id == baidID):
         # open data.json in read mode and open temp.json in write mode
-        with open("data.json", 'r') as data:
-            with open("temp.json", 'w') as temp:
+        with open(FAV_DATA_PATH, 'r') as data:
+            with open((ROOT_DIR / 'temp.json'), 'w') as temp:
                 datafile_lines = data.readlines()
 
                 for i in range(0, len(datafile_lines)):
@@ -209,8 +215,8 @@ async def deletefav(interaction: discord.Interaction, thing: str):
                         break
 
         # open data.json in write mode and temp.json in read mode
-        with open("data.json", 'w') as data:
-            with open("temp.json", 'r') as temp:
+        with open(FAV_DATA_PATH, 'w') as data:
+            with open((ROOT_DIR / 'temp.json'), 'r') as temp:
                 # read through temp.json and copy every line back to data.json
                 for line in temp:
                     print("writing line: " + line + " to data")
@@ -231,7 +237,7 @@ async def emptyfavs(interaction: discord.Interaction):
     embed_message.set_author(name=f"Requested from {interaction.user.name}", icon_url=interaction.user.avatar)
     embed_message.set_thumbnail(url=interaction.guild.icon)
 
-    with open("data.json", 'r') as f:
+    with open(FAV_DATA_PATH, 'r') as f:
         data = json.load(f)
     # iterate through entire dictionary, if the favorite is listed as "None"
     # add the corresponding 'thing' to 'emptyItems' string array
@@ -254,8 +260,8 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         # defer allows discord to wait for a response longer than 3 seconds
         await interaction.response.defer()
         # download the attached image
-        await image.save("tempImage.png")
-        template = Image.open("tempImage.png")
+        await image.save(ROOT_DIR / "tempImage.png")
+        template = Image.open(ROOT_DIR / "tempImage.png")
 
         # font size scales with image width
         font_size = int(template.width / 12)
@@ -270,49 +276,57 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         # split string into multiple strings based on character length 'width'
         lines = textwrap.wrap(toptext.upper(), width=20)
         # text width and height
-        tw, th = font.getsize(toptext)
+        tleft, ttop, tright, tbottom = font.getbbox(toptext)
+        tw = tright - tleft
+        th = tbottom - ttop
         # top left text box coordinate with respect to image pixels. Top left of image is 0,0
         cx, cy = int(template.width / 2), text_margin
         # y_text offset
         y_text = (cy - th / 2)
 
         for line in lines:
-            tw, th = font.getsize(line)
+            tleft, ttop, tright, tbottom = font.getbbox(line)
+            tw = tright - tleft
+            th = tbottom - ttop
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, cy), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.png")
+            template.save(ROOT_DIR / "meme-generated.png")
             cy += th
 
         # Bottom Text -------------------------------------------
         lines = textwrap.wrap(bottext.upper(), width=20)
-        tw, th = font.getsize(bottext)
+        tleft, ttop, tright, tbottom = font.getbbox(bottext)
+        tw = tright - tleft
+        th = tbottom - ttop
         cx, cy = (template.width / 2, template.height - text_margin)
         y_text = (cy - th * len(lines))
 
         for line in lines:
-            tw, th = font.getsize(line)
+            tleft, ttop, tright, tbottom = font.getbbox(line)
+            tw = tright - tleft
+            th = tbottom - ttop
             draw = ImageDraw.Draw(template)
             draw.text((cx - tw / 2, y_text), line, text_color, font=font, stroke_width=stroke_width,
                       stroke_fill=stroke_color)
-            template.save("meme-generated.png")
+            template.save(ROOT_DIR / "meme-generated.png")
             y_text += th
 
         # Check if image is under 25Mb to be able to upload back, decrease quality of image by 5% on each pass
-        if os.path.getsize(("meme-generated.png")) >= maxFileSize:
+        if os.path.getsize((ROOT_DIR / "meme-generated.png")) >= maxFileSize:
             img_quality = 100
-            template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
-            while os.path.getsize("meme-generated.jpg") >= maxFileSize:
+            template.save(ROOT_DIR / "meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
+            while os.path.getsize(ROOT_DIR / "meme-generated.jpg") >= maxFileSize:
                 print(f"File is too large! Compressing image to {img_quality}% as JPEG")
-                template.save("meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
+                template.save(ROOT_DIR / "meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
                 # if (somehow) image quality is at 0 and the file is still too large, return a message
-                if img_quality == 0 and os.path.getsize("meme-generated.jpeg") >= maxFileSize:
+                if img_quality == 0 and os.path.getsize(ROOT_DIR / "meme-generated.jpeg") >= maxFileSize:
                     await interaction.followup.send("File is too large!")
                     return
-            await interaction.followup.send(file=discord.File("meme-generated.jpeg"))
+            await interaction.followup.send(file=discord.File(ROOT_DIR / "meme-generated.jpeg"))
             return
-        await interaction.followup.send(file=discord.File("meme-generated.png"))
+        await interaction.followup.send(file=discord.File(ROOT_DIR / "meme-generated.png"))
     else:
         await interaction.response.send_message("File must be an image!")
 
@@ -324,8 +338,8 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         await interaction.response.defer()
 
         # download the attached GIF
-        await gif_file.save("input.gif")
-        giftemplate = Image.open("input.gif")
+        await gif_file.save(ROOT_DIR / "input.gif")
+        giftemplate = Image.open(ROOT_DIR / "input.gif")
         gif_loop = giftemplate.info['loop']
         font_size = int(giftemplate.width / 10)
         font = ImageFont.truetype("Futura Condensed Extra Bold Regular.ttf", font_size)
@@ -333,7 +347,9 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 
         lines = textwrap.wrap(caption, width=17)
         # text width and height
-        tw, th = font.getsize(caption)
+        tleft, ttop, tright, tbottom = font.getbbox(caption)
+        tw = tright - tleft
+        th = tbottom - ttop
 
         # height of white box to add at top
         padding_height = int((th * len(lines)) + th / 2)
@@ -350,7 +366,9 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 
         # draw text lines in the extra height
         for line in lines:
-            tw, th = font.getsize(line)
+            tleft, ttop, tright, tbottom = font.getbbox(line)
+            tw = tright - tleft
+            th = tbottom - ttop
             draw = ImageDraw.Draw(result_template)
             draw.text((cx - tw / 2, y_text), line, text_color, font=font)
             y_text += th
@@ -368,9 +386,9 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
             temp.save(b, format="GIF")
             temp = Image.open(b)
             frames.append(temp)
-        frames[0].save('meme_out.gif', save_all=True, append_images=frames[1:], loop=gif_loop,
+        frames[0].save(ROOT_DIR / 'meme_out.gif', save_all=True, append_images=frames[1:], loop=gif_loop,
                        duration=total_duration / len(frames))
-        await interaction.followup.send(file=discord.File("meme_out.gif"))
+        await interaction.followup.send(file=discord.File(ROOT_DIR / "meme_out.gif"))
     else:
         await interaction.response.send_message("File must be a GIF!")
 
@@ -379,32 +397,32 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
 async def speechbubble(interaction: discord.Interaction, image: discord.Attachment):
     await interaction.response.defer()
     if "image" in image.content_type and 'gif' not in image.content_type:
-        await image.save("speechmemetemp.png")
-        speech_template = Image.open("speechmemetemp.png")
-        speech_bubble = Image.open("SBOverlay.png")
+        await image.save(ROOT_DIR / "speechmemetemp.png")
+        speech_template = Image.open(ROOT_DIR / "speechmemetemp.png")
+        speech_bubble = Image.open(ROOT_DIR / "SBOverlay.png")
         speech_bubble = speech_bubble.resize((speech_template.width, int(speech_template.height / 3)))
         # Check if original image has transparency, use alpha_composite() if so
         if speech_template.mode != "RBGA":
             speech_template.paste(speech_bubble, (0, 0), speech_bubble)
         else:
             speech_template.alpha_composite(speech_bubble, (0, 0))
-        speech_template.save("SBresult.png")
+        speech_template.save(ROOT_DIR / "SBresult.png")
 
         # Check if image is under 25Mb to be able to upload back, decrease quality of image by 5% on each pass
-        if os.path.getsize(("SBresult.png")) >= maxFileSize:
+        if os.path.getsize((ROOT_DIR / "SBresult.png")) >= maxFileSize:
             img_quality = 100
-            speech_template.save("SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
-            while os.path.getsize("SBresult.jpg") >= maxFileSize:
+            speech_template.save(ROOT_DIR / "SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
+            while os.path.getsize(ROOT_DIR / "SBresult.jpg") >= maxFileSize:
                 print(f"File is too large! Compressing image to {img_quality}% as JPEG")
-                speech_template.save("SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
+                speech_template.save(ROOT_DIR / "SBresult.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
                 # if (somehow) image quality is at 0 and the file is still too large, return a message
-                if img_quality == 0 and os.path.getsize("SBresult.jpeg") >= maxFileSize:
+                if img_quality == 0 and os.path.getsize(ROOT_DIR / "SBresult.jpeg") >= maxFileSize:
                     await interaction.followup.send("File is too large!")
                     return
-            await interaction.followup.send(file=discord.File("SBresult.jpeg"))
+            await interaction.followup.send(file=discord.File(ROOT_DIR / "SBresult.jpeg"))
             return
-        await interaction.followup.send(file=discord.File("SBresult.png"))
+        await interaction.followup.send(file=discord.File(ROOT_DIR / "SBresult.png"))
     else:
         await interaction.response.send_message("File must be an image!")
 
@@ -450,7 +468,7 @@ async def help(interaction: discord.Interaction):
 @client.tree.command(name="jar", description=f"{word} leaderboard")
 async def jar(interaction: discord.Interaction):
     data = {}
-    with open("ccounter.json", 'r') as f:
+    with open(ROOT_DIR / "ccounter.json", 'r') as f:
         data = json.load(f)
     author = interaction.user.id
     author_place = -1
@@ -486,11 +504,11 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         try:
             # opens attached image, rotates it 270deg, expands image size to accomodate rotation if needed, then resizes down
             # to a maximum of 320x160px
-            await image.save("tempImage.jpg")
+            await image.save(ROOT_DIR / "tempImage.jpg")
 
-            with Image.open("tempImage.jpg") as msg_image:
+            with Image.open(ROOT_DIR / "tempImage.jpg") as msg_image:
                 msg_image.thumbnail((320, 160))  # resizes image with a max of (width x height)
-                msg_image.save("tempImage.png", optimize=True)
+                msg_image.save(ROOT_DIR / "tempImage.png", optimize=True)
         except:
             await interaction.followup.send(
                 "Error resizing or saving image")
@@ -498,7 +516,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
         out_str = ""
 
         #  convert image to byte array
-        img_data = np.fromfile("tempImage.png", dtype='uint8')
+        img_data = np.fromfile(ROOT_DIR / "tempImage.png", dtype='uint8')
         img_data = bytearray(img_data)
 
         array_content = ""
@@ -567,7 +585,7 @@ async def on_message(message):
         return
 
     # Forward all text messages in voice channels to a single text channel
-    if message.channel.id in voice_channel_list:
+    if message.channel.id in voice_channel_list and not message.author.bot:
         # embed message
         embed_message = discord.Embed(color=message.author.accent_color, timestamp=message.created_at)
         embed_message.set_author(name=f"{message.author.display_name} - {message.channel.name}", url=message.jump_url,
@@ -590,20 +608,24 @@ async def on_message(message):
     if ccount > 0:
         data = {}
         user = str(message.author.id)
-        with open("ccounter.json", 'r+') as f:
+        with open(ROOT_DIR / "ccounter.json", 'r+') as f:
             data = json.load(f)
         if data.get(user, "failed") == "failed":
             data[user] = ccount
         else:
             data[user] += ccount
         f.close()
-        with open("ccounter.json", 'w') as f:
+        with open(ROOT_DIR / "ccounter.json", 'w') as f:
             json.dump(data, f, indent=4)
 
 
     # hello
     if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
         await message.channel.send(f"Hi <@{message.author.id}>! :heart:")
+    
+    # :(
+    if message.content.startswith('fuck you baidbot'):
+        await message.channel.send(f":cry:")
 
     # who asked
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
@@ -614,13 +636,18 @@ async def on_message(message):
         emoji = '\N{Face with One Eyebrow Raised}'
         await message.add_reaction(emoji)
 
-    # funni
-    last_word = message.content.split()[-1]
-    if message.content.endswith("er") and random.randint(1, 500) == 1:
-        await message.channel.send(f"{last_word}!? I hardly know her!")
+    # small chance for unfunny joke :)
+    try:
+        last_word = message.content.split()[-1]
+        rand = random.random()
+        if last_word.endswith("er") and rand <= hardly_know_chance:
+            await message.channel.send(f"{last_word}!? I hardly know her!")
+    except Exception as e:
+        print("Exception at funni words: " + message.content)
+        
 
     # twitter
-    # if message.content.startswith("https://twitter.com/"):
-    #    await message.channel.send(f"https://vxtwitter.com/" + message.content[20:])
+    # if message.content.startswith("https://x.com/"):
+    #    await message.channel.send(f"https://vxtwitter.com/" + message.content[14:])
 
 client.run(BotToken)
