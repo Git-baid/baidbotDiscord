@@ -28,6 +28,9 @@ from discord.ext import commands, tasks
 from BotTokens import BotToken, SteamAPIToken
 from word import word
 
+# For LLM
+import ollama
+
 # Root directory for this script, used for referencing files in same
 ROOT_DIR = Path(__file__).parent
 FAV_DATA_PATH = ROOT_DIR / 'data.json'
@@ -50,6 +53,11 @@ hardly_know_chance = 0.005
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
 notified = False
+
+# Ollama LLM
+# Initialize ollama client
+ollama_client = ollama.Client()
+OLLAMA_MODEL = "baidbotllama3.2:1b"
 
 # cycle activity status
 bot_status = cycle(
@@ -135,14 +143,14 @@ async def addfav(interaction: discord.Interaction, item: str):
         # add a comma to end of second to last line and add a new line with the added item
         # and corresponding value "None", then write it back to data.json
         if data.get(item, "failed") == "failed":
-            with open("data.json", "r") as fr:
+            with open(FAV_DATA_PATH, "r") as fr:
                 lines = fr.readlines()[:-1]
                 lines[-1] = lines[-1][:-1] + ','
                 fr.close()
 
                 item2 = None
                 lines.append(f"\n    \"{item}\": \"{item2}\"\n}}")
-                with open("data.json", "w") as fw:
+                with open(FAV_DATA_PATH, "w") as fw:
                     fw.writelines(lines)
             await interaction.response.send_message(
                 f"New thing added <@274705127380615179> Use /updatefav to add your favorite {item}!")
@@ -582,6 +590,21 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
 async def on_message(message):
     # if message is from baidbot, ignore all other if statements
     if message.author == client.user:
+        return
+
+    # Prompt LLM
+    if "baidbot" in message.content or client.user in message.mentions:
+        response_msg = await message.reply(content="-# *baidbot is typing...*", silent=True)
+        response_str = ""
+        response_stream = ollama.generate(model=OLLAMA_MODEL, prompt=message.content, stream=True)
+        for chunk in response_stream:
+            print(chunk['response'], end='', flush=True)
+            response_str += chunk['response']
+            # Edit message in real time (slow)
+            #await response_msg.edit(content=response_str)
+            if len(chunk['response'].splitlines()) > 1:     # Everytime there is a newline, update the discord message
+                await response_msg.edit(content=response_str + "-# *baidbot is typing...*")
+        await response_msg.edit(content=(response_str + ""))
         return
 
     # Forward all text messages in voice channels to a single text channel
