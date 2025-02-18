@@ -28,6 +28,9 @@ from discord.ext import commands, tasks
 from BotTokens import BotToken, SteamAPIToken
 from word import word
 
+# For LLM
+import ollama
+
 # Root directory for this script, used for referencing files in same
 ROOT_DIR = Path(__file__).parent
 FAV_DATA_PATH = ROOT_DIR / 'data.json'
@@ -50,6 +53,14 @@ hardly_know_chance = 0.005
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
 notified = False
+
+# Ollama LLM
+# Initialize ollama client
+ollama_client = ollama.Client()
+OLLAMA_MODEL = "baidbotUncensored"
+
+chat_history_dict = {12345678: [{'role': 'user', 'content': "test1"}, 
+                                {'role': 'user', 'content': "test2"}]}
 
 # cycle activity status
 bot_status = cycle(
@@ -135,14 +146,14 @@ async def addfav(interaction: discord.Interaction, item: str):
         # add a comma to end of second to last line and add a new line with the added item
         # and corresponding value "None", then write it back to data.json
         if data.get(item, "failed") == "failed":
-            with open("data.json", "r") as fr:
+            with open(FAV_DATA_PATH, "r") as fr:
                 lines = fr.readlines()[:-1]
                 lines[-1] = lines[-1][:-1] + ','
                 fr.close()
 
                 item2 = None
                 lines.append(f"\n    \"{item}\": \"{item2}\"\n}}")
-                with open("data.json", "w") as fw:
+                with open(FAV_DATA_PATH, "w") as fw:
                     fw.writelines(lines)
             await interaction.response.send_message(
                 f"New thing added <@274705127380615179> Use /updatefav to add your favorite {item}!")
@@ -316,7 +327,7 @@ async def meme(interaction: discord.Interaction, image: discord.Attachment, topt
         if os.path.getsize((ROOT_DIR / "meme-generated.png")) >= maxFileSize:
             img_quality = 100
             template.save(ROOT_DIR / "meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
-            while os.path.getsize(ROOT_DIR / "meme-generated.jpg") >= maxFileSize:
+            while os.path.getsize(ROOT_DIR / "meme-generated.jpeg") >= maxFileSize:
                 print(f"File is too large! Compressing image to {img_quality}% as JPEG")
                 template.save(ROOT_DIR / "meme-generated.jpeg", "jpeg", optimize=True, quality=img_quality)
                 img_quality -= 5
@@ -573,17 +584,54 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                 link.close()
                 await interaction.followup.send("Image sent successfully")
     else:
-        await interaction.followup.send("File must be an image!")
+        await interaction.followup.send("File must be an image!")  
 
-    # On message...
+# Handle Ollama requests
+async def chat_with_baidbot(message):
+    response_msg = await message.reply(content="-# *baidbot is typing...*", silent=True)
+    response_str = ""
 
+    # Update or create chat history
+    if message.guild.id not in chat_history_dict:
+        chat_history_dict[message.guild.id] = []
+    while len(chat_history_dict[message.guild.id]) > 10:
+        chat_history_dict[message.guild.id].pop(0)
 
+    chat_history_dict.get(message.guild.id).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
+
+    
+    print(chat_history_dict[message.guild.id])
+    print(len(chat_history_dict[message.guild.id]))
+
+    # prompt model
+    response_stream = ollama.chat(model=OLLAMA_MODEL, 
+                                  messages=chat_history_dict[message.guild.id], 
+                                  stream=True)
+    
+    # Process response
+    for chunk in response_stream:
+        print(chunk['message']['content'], end='', flush=True)
+        response_str += chunk['message']['content']
+        if '.' in chunk['message']['content'] or '!' in chunk['message']['content'] or '?' in chunk['message']['content']:     # Everytime there is a new sentence, update the discord message
+            await response_msg.edit(content=response_str + "\n-# *baidbot is typing...*")
+    
+    chat_history_dict.get(message.guild.id).append({'role': 'assistant', 'content': response_str})
+    print('\n')
+
+    await response_msg.edit(content=(response_str + ""))
+
+# On message...
 @client.event
 async def on_message(message):
     # if message is from baidbot, ignore all other if statements
     if message.author == client.user:
         return
 
+    # Prompt LLM
+    if "baidbot" in message.content.lower() or client.user in message.mentions:
+        await chat_with_baidbot(message)
+        return
+    
     # Forward all text messages in voice channels to a single text channel
     if message.channel.id in voice_channel_list and not message.author.bot:
         # embed message
