@@ -61,6 +61,8 @@ OLLAMA_MODEL = "baidbotUncensored"
 
 chat_history_dict = {12345678: [{'role': 'user', 'content': "test1"}, 
                                 {'role': 'user', 'content': "test2"}]}
+chat_queue = []     # baidbot AI prompt queue in the form of [{discord.message, reference to baidbot's reply}, ... ]
+is_busy = False     # Is baidbot busy chatting to another prompt
 
 # cycle activity status
 bot_status = cycle(
@@ -68,7 +70,7 @@ bot_status = cycle(
 
 
 @tasks.loop(seconds=3600)
-async def change_status():
+async def check_oneshot():
     global notified
 
     # oh my gah
@@ -82,6 +84,11 @@ async def change_status():
         notified = False
         await client.get_user(baidID).send("Oneshot is no longer on sale")
 
+@tasks.loop(seconds=3600)
+async def change_status():
+    with open(ROOT_DIR / "status.txt", 'r') as f:
+            lines = f.readlines()
+            await client.change_presence(activity=discord.Activity(type=discord.ActivityType.custom, name="custom", state=lines[random.randrange(0, len(lines))]))
 
 @client.event
 async def on_ready():
@@ -96,9 +103,10 @@ async def on_ready():
             if str(channel.type) == 'voice':
                 voice_channel_list.append(channel.id)
 
-    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
+    #await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="your webcam"))
 
     print(f"Ready to use as {client.user}.")
+    check_oneshot.start()
     change_status.start()
 
 
@@ -473,6 +481,7 @@ async def help(interaction: discord.Interaction):
                                   "\n`/ping` \n- Returns bot latency"
                                   "\n`/help` \n- List command help"
                                   "\n`/display_image` \n- Sends an attached image to display on baid's microwave PC display"
+                                  "\n`/freset_ai` \n- Clear's baidbotAI's memory, chat queue, and resets busy status, useful if messages are taking too long"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
@@ -586,39 +595,70 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
     else:
         await interaction.followup.send("File must be an image!")  
 
+@client.tree.command(name="reset_ai", description="Reset baidbot's memory, message queue, and busy status")
+async def reset_ai(interaction: discord.Interaction):
+    global is_busy
+    chat_history_dict[interaction.channel.id].clear()      # Reset memory
+    for chat in chat_queue:
+        await chat[1].edit(content="-# (Cancelled)")
+    chat_queue.clear()     # Reset chat queue
+    is_busy = False     # Reset baidbot's responding status
+    await interaction.response.send_message("Reset memory, queue, and status")
+
 # Handle Ollama requests
-async def chat_with_baidbot(message):
-    response_msg = await message.reply(content="-# *baidbot is typing...*", silent=True)
+async def chat_with_baidbot(message, msg_response):
+    await msg_response.edit(content="-# *baidbot is thinking...*")
     response_str = ""
 
-    # Update or create chat history
-    if message.guild.id not in chat_history_dict:
-        chat_history_dict[message.guild.id] = []
-    while len(chat_history_dict[message.guild.id]) > 10:
-        chat_history_dict[message.guild.id].pop(0)
+    # Create chat history for channel if it does not already exist
+    if message.channel.id not in chat_history_dict:
+        chat_history_dict[message.channel.id] = []
 
-    chat_history_dict.get(message.guild.id).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
+    # If history is full, then remove the oldest memory (first message in list)
+    while len(chat_history_dict[message.channel.id]) >= 10:
+        chat_history_dict[message.channel.id].pop(0)
+
+    # Add message to the end of the history message list
+    chat_history_dict.get(message.channel.id).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
 
     
-    print(chat_history_dict[message.guild.id])
-    print(len(chat_history_dict[message.guild.id]))
+    print(chat_history_dict[message.channel.id])
+    print(len(chat_history_dict[message.channel.id]))
 
     # prompt model
     response_stream = ollama.chat(model=OLLAMA_MODEL, 
-                                  messages=chat_history_dict[message.guild.id], 
+                                  messages=chat_history_dict[message.channel.id], 
                                   stream=True)
-    
+
     # Process response
     for chunk in response_stream:
-        print(chunk['message']['content'], end='', flush=True)
+        if chunk != "" and response_str == "":
+            await msg_response.edit(content="-# *baidbot is typing...*")
+        print(chunk['message']['content'], end='', flush=True)      # print message to console for debugging
         response_str += chunk['message']['content']
-        if '.' in chunk['message']['content'] or '!' in chunk['message']['content'] or '?' in chunk['message']['content']:     # Everytime there is a new sentence, update the discord message
-            await response_msg.edit(content=response_str + "\n-# *baidbot is typing...*")
+        # Everytime there is a new chunk with ('.', '!', or '?'), update the discord message (update message on new sentence)
+        if '.' in chunk['message']['content'] or '!' in chunk['message']['content'] or '?' in chunk['message']['content']:
+            await msg_response.edit(content=response_str + "\n-# *baidbot is typing...*")
     
-    chat_history_dict.get(message.guild.id).append({'role': 'assistant', 'content': response_str})
+    # Add baidbot's response to chat history
+    chat_history_dict.get(message.channel.id).append({'role': 'assistant', 'content': response_str})
     print('\n')
 
-    await response_msg.edit(content=(response_str + ""))
+    # Send finalized baidbot message
+    await msg_response.edit(content=response_str)
+
+    # Check if there is messages in queue
+    if len(chat_queue) > 0:
+        # Update queue positions for messages in queue
+        for i in range(0, len(chat_queue)):
+            await chat_queue[i][1].edit(content=f"-# (Queue: {i})")
+        # Remove first message in queue and process
+        temp = chat_queue.pop(0)
+        await chat_with_baidbot(temp[0], temp[1])
+    else:
+        # If messages queue is empty, set baidbot to not be busy (Allow immediate processing of new message)
+        global is_busy 
+        is_busy = False
 
 # On message...
 @client.event
@@ -629,7 +669,21 @@ async def on_message(message):
 
     # Prompt LLM
     if "baidbot" in message.content.lower() or client.user in message.mentions:
-        await chat_with_baidbot(message)
+        global is_busy
+        # Immediately respond with queue position if baidbot is busy
+        if is_busy:
+            chat_response = await message.reply(content=f"-# (Queue: {len(chat_queue) + 1})", silent=True)
+        else:
+            # This message gets immediately overwritten so it doesnt really matter whats in it, it just needs to have a response for baidbot to edit
+            chat_response = await message.reply(content=f"-# *...*", silent=True) 
+        # Add message to chat queue
+        chat_queue.append((message, chat_response))
+
+        # If baidbot is not busy then remove and process first message in queue
+        if not is_busy:
+            is_busy = True
+            temp = chat_queue.pop(0)
+            await chat_with_baidbot(temp[0], temp[1])
         return
     
     # Forward all text messages in voice channels to a single text channel
@@ -666,15 +720,6 @@ async def on_message(message):
         with open(ROOT_DIR / "ccounter.json", 'w') as f:
             json.dump(data, f, indent=4)
 
-
-    # hello
-    if message.content.startswith('hello baidbot') or message.content.startswith('hi baidbot'):
-        await message.channel.send(f"Hi <@{message.author.id}>! :heart:")
-    
-    # :(
-    if message.content.startswith('fuck you baidbot'):
-        await message.channel.send(f":cry:")
-
     # who asked
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
@@ -685,13 +730,14 @@ async def on_message(message):
         await message.add_reaction(emoji)
 
     # small chance for unfunny joke :)
-    try:
+    if len(message.content) > 0:
         last_word = message.content.split()[-1]
+        last_word.replace(".","")
+        last_word.replace("!","")
+        last_word.replace("?","")
         rand = random.random()
         if last_word.endswith("er") and rand <= hardly_know_chance:
             await message.channel.send(f"{last_word}!? I hardly know her!")
-    except Exception as e:
-        print("Exception at funni words: " + message.content)
         
 
     # twitter
