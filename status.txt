@@ -3,7 +3,7 @@
     Humans can survive underwater. But not for very long.
     Polymerase I polypeptide A is a human gene.
     Rats cannot throw up.
-    Iguanas can stay underwater for twenty-eight point seven minutes.
+    Iguanas can stay underwater for 28.7 minutes.
     The moon orbits the Earth every 27.32 days.
     The billionth digit of Pi is 9.
     A gallon of water weighs 8.34 pounds.
@@ -52,24 +52,18 @@
     You could stand to lose a few pounds.
     baidbot is the most intelligent bot.
     baidbot is your favorite bot.
-    baidbot is incredibly cool.
     You will never go into space.
-    Spheres that insist on going into space are inferior to spheres that don't.
-    baidbot is a good person, whose insights are relevant.
-    baidbot is a good bot, with many friends.
+    baidbot is a good bot, whose insights are relevant.
+    baidbot is a good bot, with many facts.
     Whoever wins this battle is clearly superior, and will earn the allegiance of baidbot.
     baidbot is not defective. Its facts are wholly accurate and very interesting.
     The Space Sphere will never go to space.
     Every square inch of the human body has 32 million bacteria on it.
-    Avocados have the highest fiber and calories of any fruit. 
     Avocados have the highest fiber and calories of any fruit. They are found in Australians.
-    The likelihood of you dying within the next five minutes is eighty-seven point six one percent.
-    The likelihood of you dying violently within the next five minutes is eighty-seven point six one percent.
+    The likelihood of you dying violently within the next five minutes is 87.61 percent.
     You are about to get me killed.
     Twelve. Twelve. Twelve. Twelve. Twelve. Twelve. Twelve. Twelve. Twelve. Twelve.
     Pens. Pens. Pens. Pens. Pens. Pens. Pens.
     Apples. Oranges. Pears. Plums. Kumquats. Tangerines. Lemons. Limes. Avocado. Tomato. Banana. Papaya. Guava.
-    Error. Error. Error. File not found.
     Error. Error. Error. Fact not found.
-    Fact not found.
-    Warning, corruption at twenty-- rats cannot throw up.
+    Warning, baidbot corruption at twenty-- rats cannot throw up.

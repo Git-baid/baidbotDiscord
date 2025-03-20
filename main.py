@@ -9,6 +9,8 @@ from pathlib import Path
 # display_image()
 import re
 import numpy as np
+import socket
+from display_image_network_details import ssid, password, esp_host_ip, port
 
 # for LCD
 import serial
@@ -30,6 +32,9 @@ from word import word
 
 # For LLM
 import ollama
+
+# For changing status daily
+import datetime
 
 # Root directory for this script, used for referencing files in same
 ROOT_DIR = Path(__file__).parent
@@ -84,11 +89,13 @@ async def check_oneshot():
         notified = False
         await client.get_user(baidID).send("Oneshot is no longer on sale")
 
-@tasks.loop(seconds=3600)
+@tasks.loop(seconds=3600 * 24)
 async def change_status():
     with open(ROOT_DIR / "status.txt", 'r') as f:
             lines = f.readlines()
-            await client.change_presence(activity=discord.Activity(type=discord.ActivityType.custom, name="custom", state=lines[random.randrange(0, len(lines))]))
+            random.seed(str(datetime.datetime.now().date()))
+            new_status = lines[random.randrange(0, len(lines))]
+            await client.change_presence(activity=discord.Activity(type=discord.ActivityType.custom, name="custom", state=new_status))
 
 @client.event
 async def on_ready():
@@ -513,7 +520,7 @@ async def jar(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed_message)
 
 @client.tree.command(name="display_image",
-                     description="Send an image to display on baid's PC display, may take between 5-40 seconds depending on image size")
+                     description="Send an image to display on baid's PC display, may take up to a minute depending on image size")
 async def display_image(interaction: discord.Interaction, image: discord.Attachment):
     # defer allows discord to wait for a response longer than 3 seconds
     await interaction.response.defer(ephemeral=True)
@@ -554,24 +561,12 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
             await interaction.followup.send(
                 f"Converted image is too large! ({image_size} bytes > {max_image_size} maximum bytes)")
         else:
-            #  send image data
-            if __name__ == '__main__':
-                try:
-                    link = serial.Serial(
-                        port="/dev/ttyUSB0",  # Replace with the appropriate port
-                        baudrate=115200,  # Set the baud rate
-                        parity=serial.PARITY_EVEN,  # Set parity (None, Even, Odd, Mark, Space)
-                        stopbits=serial.STOPBITS_ONE,  # Set number of stop bits (1, 1.5, 2)
-                        bytesize=serial.EIGHTBITS,  # Set data byte size (5, 6, 7, 8)
-                        timeout=5,  # Set timeout value in seconds
-                        xonxoff=False,  # Enable/disable software flow control (XON/XOFF)
-                        rtscts=False  # Enable/disable hardware (RTS/CTS) flow control
-                    )
-                    link.setRTS(False)
-                    link.setDTR(False)
-                except:
-                    await interaction.followup.send(
-                        "USB Serial Connection Error to ESP32, baid probably has it unplugged")
+            # TODO: send image data
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            try:
+                s.connect((esp_host_ip, port))
+
                 out_pkg = "<"  # start of data flag
                 out_pkg += str(image_size)
 
@@ -583,15 +578,19 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
                     count += 1
 
                     if count % 1024 == 0:
-                        print(out_pkg)
-                        link.write(out_pkg.encode())  # send out_pkg as bytes
+                        s.sendall(out_pkg.encode())  # send out_pkg as bytes
                         out_pkg = ""
 
                 out_pkg += ">"  # end of data flag
 
-                link.write(out_pkg.encode())  # send out_pkg as bytes
-                link.close()
-                await interaction.followup.send("Image sent successfully")
+                s.sendall(out_pkg.encode())  # send out_pkg as bytes
+                await interaction.followup.send("Image sent successfully")\
+                
+            except:
+                await interaction.followup.send("Can't connect to baid's screen (might be turned off)")
+            finally:
+                s.close()
+
     else:
         await interaction.followup.send("File must be an image!")  
 
@@ -666,25 +665,6 @@ async def on_message(message):
     # if message is from baidbot, ignore all other if statements
     if message.author == client.user:
         return
-
-    # Prompt LLM
-    if "baidbot" in message.content.lower() or client.user in message.mentions:
-        global is_busy
-        # Immediately respond with queue position if baidbot is busy
-        if is_busy:
-            chat_response = await message.reply(content=f"-# (Queue: {len(chat_queue) + 1})", silent=True)
-        else:
-            # This message gets immediately overwritten so it doesnt really matter whats in it, it just needs to have a response for baidbot to edit
-            chat_response = await message.reply(content=f"-# *...*", silent=True) 
-        # Add message to chat queue
-        chat_queue.append((message, chat_response))
-
-        # If baidbot is not busy then remove and process first message in queue
-        if not is_busy:
-            is_busy = True
-            temp = chat_queue.pop(0)
-            await chat_with_baidbot(temp[0], temp[1])
-        return
     
     # Forward all text messages in voice channels to a single text channel
     if message.channel.id in voice_channel_list and not message.author.bot:
@@ -720,14 +700,33 @@ async def on_message(message):
         with open(ROOT_DIR / "ccounter.json", 'w') as f:
             json.dump(data, f, indent=4)
 
+    if word in message.content:
+        emoji = '\N{Face with One Eyebrow Raised}'
+        await message.add_reaction(emoji)
+
+    # Prompt LLM
+    if "baidbot" in message.content or client.user in message.mentions or isinstance(message.channel, discord.DMChannel):
+        global is_busy
+        # Immediately respond with queue position if baidbot is busy
+        if is_busy:
+            chat_response = await message.reply(content=f"-# (Queue: {len(chat_queue) + 1})", silent=True)
+        else:
+            # This message gets immediately overwritten so it doesnt really matter whats in it, it just needs to have a response for baidbot to edit
+            chat_response = await message.reply(content=f"-# *...*", silent=True) 
+        # Add message to chat queue
+        chat_queue.append((message, chat_response))
+
+        # If baidbot is not busy then remove and process first message in queue
+        if not is_busy:
+            is_busy = True
+            temp = chat_queue.pop(0)
+            await chat_with_baidbot(temp[0], temp[1])
+        return
+
     # who asked
     if message.content.lower() == "who asked" or message.content.lower() == "didnt ask" or message.content.lower() == "didn't ask":
         await message.channel.send(
             "https://tenor.com/view/i-asked-halo-halo-infinite-master-chief-chimp-zone-gif-24941497")
-
-    if word in message.content:
-        emoji = '\N{Face with One Eyebrow Raised}'
-        await message.add_reaction(emoji)
 
     # small chance for unfunny joke :)
     if len(message.content) > 0:
