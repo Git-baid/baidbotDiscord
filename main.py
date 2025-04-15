@@ -54,6 +54,7 @@ maxFileSize = 25000000
 muteChat = None
 voice_channel_list=[]
 hardly_know_chance = 0.005
+baidbot_memory_buffer = 50
 
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
@@ -597,7 +598,7 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
 @client.tree.command(name="reset_ai", description="Reset baidbot's memory, message queue, and busy status")
 async def reset_ai(interaction: discord.Interaction):
     global is_busy
-    chat_history_dict[interaction.channel.id].clear()      # Reset memory
+    chat_history_dict[interaction.guild.id].clear()      # Reset memory
     for chat in chat_queue:
         await chat[1].edit(content="-# (Cancelled)")
     chat_queue.clear()     # Reset chat queue
@@ -609,24 +610,30 @@ async def chat_with_baidbot(message, msg_response):
     await msg_response.edit(content="-# *baidbot is thinking...*")
     response_str = ""
 
-    # Create chat history for channel if it does not already exist
-    if message.channel.id not in chat_history_dict:
-        chat_history_dict[message.channel.id] = []
+    # Check if message is in DM
+    if message.guild is not None:
+        message_origin = message.guild.id
+    else:
+        message_origin = message.author.id
 
+    # Create chat history for channel if it does not already exist
+    if message_origin not in chat_history_dict:
+        chat_history_dict[message_origin] = []
+    
     # If history is full, then remove the oldest memory (first message in list)
-    while len(chat_history_dict[message.channel.id]) >= 10:
-        chat_history_dict[message.channel.id].pop(0)
+    while len(chat_history_dict[message_origin]) >= baidbot_memory_buffer:
+        chat_history_dict[message_origin].pop(0)
 
     # Add message to the end of the history message list
-    chat_history_dict.get(message.channel.id).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
+    chat_history_dict.get(message_origin).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
 
     
-    print(chat_history_dict[message.channel.id])
-    print(len(chat_history_dict[message.channel.id]))
+    print(chat_history_dict[message_origin])
+    print(len(chat_history_dict[message_origin]))
 
     # prompt model
     response_stream = ollama.chat(model=OLLAMA_MODEL, 
-                                  messages=chat_history_dict[message.channel.id], 
+                                  messages=chat_history_dict[message_origin], 
                                   stream=True)
 
     # Process response
@@ -640,7 +647,7 @@ async def chat_with_baidbot(message, msg_response):
             await msg_response.edit(content=response_str + "\n-# *baidbot is typing...*")
     
     # Add baidbot's response to chat history
-    chat_history_dict.get(message.channel.id).append({'role': 'assistant', 'content': response_str})
+    chat_history_dict.get(message_origin).append({'role': 'assistant', 'content': response_str})
     print('\n')
 
     # Send finalized baidbot message
