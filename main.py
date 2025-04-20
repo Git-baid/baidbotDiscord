@@ -65,8 +65,6 @@ notified = False
 ollama_client = ollama.Client()
 OLLAMA_MODEL = "baidbotUncensored"
 
-chat_history_dict = {12345678: [{'role': 'user', 'content': "test1"}, 
-                                {'role': 'user', 'content': "test2"}]}
 chat_queue = []     # baidbot AI prompt queue in the form of [{discord.message, reference to baidbot's reply}, ... ]
 is_busy = False     # Is baidbot busy chatting to another prompt
 
@@ -489,7 +487,7 @@ async def help(interaction: discord.Interaction):
                                   "\n`/ping` \n- Returns bot latency"
                                   "\n`/help` \n- List command help"
                                   "\n`/display_image` \n- Sends an attached image to display on baid's microwave PC display"
-                                  "\n`/freset_ai` \n- Clear's baidbotAI's memory, chat queue, and resets busy status, useful if messages are taking too long"
+                                  "\n`/freset_ai` \n- Clear's chat queue and resets response status, useful if messages are taking too long"
                             , inline=False)
     await interaction.response.send_message(embed=embed_message, ephemeral=True)
 
@@ -595,15 +593,14 @@ async def display_image(interaction: discord.Interaction, image: discord.Attachm
     else:
         await interaction.followup.send("File must be an image!")  
 
-@client.tree.command(name="reset_ai", description="Reset baidbot's memory, message queue, and busy status")
+@client.tree.command(name="reset_ai", description="Reset baidbot's message queue and response status")
 async def reset_ai(interaction: discord.Interaction):
     global is_busy
-    chat_history_dict[interaction.guild.id].clear()      # Reset memory
     for chat in chat_queue:
         await chat[1].edit(content="-# (Cancelled)")
     chat_queue.clear()     # Reset chat queue
     is_busy = False     # Reset baidbot's responding status
-    await interaction.response.send_message("Reset memory, queue, and status")
+    await interaction.response.send_message("Reset queue and status")
 
 # Handle Ollama requests
 async def chat_with_baidbot(message, msg_response):
@@ -612,25 +609,28 @@ async def chat_with_baidbot(message, msg_response):
 
     # Check if message is in DM
     if message.guild is not None:
-        message_origin = message.guild.id
+        message_origin = str(message.guild.id)
     else:
-        message_origin = message.author.id
+        message_origin = str(message.author.id)
+
+    # Load chat history from file
+    chat_history_dict = {}
+    with open("chat_history.json", 'r') as f:
+        chat_history_dict = json.load(f)
 
     # Create chat history for channel if it does not already exist
-    if message_origin not in chat_history_dict:
+    if message_origin not in chat_history_dict.keys():
         chat_history_dict[message_origin] = []
-    
+        print(f"Creating new chat history for {message_origin}")
+
     # If history is full, then remove the oldest memory (first message in list)
     while len(chat_history_dict[message_origin]) >= baidbot_memory_buffer:
         chat_history_dict[message_origin].pop(0)
-
+    
     # Add message to the end of the history message list
     chat_history_dict.get(message_origin).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
 
-    
-    print(chat_history_dict[message_origin])
-    print(len(chat_history_dict[message_origin]))
-
+    print(f"{chat_history_dict[message_origin]}")
     # prompt model
     response_stream = ollama.chat(model=OLLAMA_MODEL, 
                                   messages=chat_history_dict[message_origin], 
@@ -641,7 +641,10 @@ async def chat_with_baidbot(message, msg_response):
         if chunk != "" and response_str == "":
             await msg_response.edit(content="-# *baidbot is typing...*")
         print(chunk['message']['content'], end='', flush=True)      # print message to console for debugging
-        response_str += chunk['message']['content']
+        
+        response_str += re.sub(r'\n+', '\n', chunk['message']['content'])       # remove extra newlines
+        #response_str += chunk['message']['content']      # add message to response string
+
         # Everytime there is a new chunk with ('.', '!', or '?'), update the discord message (update message on new sentence)
         if '.' in chunk['message']['content'] or '!' in chunk['message']['content'] or '?' in chunk['message']['content']:
             await msg_response.edit(content=response_str + "\n-# *baidbot is typing...*")
@@ -652,6 +655,9 @@ async def chat_with_baidbot(message, msg_response):
 
     # Send finalized baidbot message
     await msg_response.edit(content=response_str)
+
+    with open("chat_history.json", 'w') as f:
+        json.dump(chat_history_dict, f, indent=4)
 
     # Check if there is messages in queue
     if len(chat_queue) > 0:
