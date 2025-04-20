@@ -54,7 +54,7 @@ maxFileSize = 25000000
 muteChat = None
 voice_channel_list=[]
 hardly_know_chance = 0.005
-baidbot_memory_buffer = 50
+BAIDBOT_MEMORY_BUFFER = 200  # number of messages to keep in memory from both user and baidbot
 
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
@@ -624,7 +624,7 @@ async def chat_with_baidbot(message, msg_response):
         print(f"Creating new chat history for {message_origin}")
 
     # If history is full, then remove the oldest memory (first message in list)
-    while len(chat_history_dict[message_origin]) >= baidbot_memory_buffer:
+    while len(chat_history_dict[message_origin]) >= BAIDBOT_MEMORY_BUFFER:
         chat_history_dict[message_origin].pop(0)
     
     # Add message to the end of the history message list
