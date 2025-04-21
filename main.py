@@ -630,7 +630,9 @@ async def chat_with_baidbot(message, msg_response):
     # Add message to the end of the history message list
     chat_history_dict.get(message_origin).append({'role': 'user', 'content': message.author.display_name + " says: " + message.content})
 
-    print(f"{chat_history_dict[message_origin]}")
+    # print message to console for debugging
+    print(f"{chat_history_dict[message_origin][-1]['content']} - (guildid / authorid (DM): {message_origin}, history length: {len(chat_history_dict[message_origin])})")  
+    
     # prompt model
     response_stream = ollama.chat(model=OLLAMA_MODEL, 
                                   messages=chat_history_dict[message_origin], 
@@ -642,7 +644,7 @@ async def chat_with_baidbot(message, msg_response):
             await msg_response.edit(content="-# *baidbot is typing...*")
         print(chunk['message']['content'], end='', flush=True)      # print message to console for debugging
         
-        response_str += re.sub(r'\n+', '\n', chunk['message']['content'])       # remove extra newlines
+        response_str += re.sub(r'\n\n+', '\n\n', chunk['message']['content'])       # remove extra newlines
         #response_str += chunk['message']['content']      # add message to response string
 
         # Everytime there is a new chunk with ('.', '!', or '?'), update the discord message (update message on new sentence)
