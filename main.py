@@ -54,7 +54,7 @@ maxFileSize = 25000000
 muteChat = None
 voice_channel_list=[]
 hardly_know_chance = 0.005
-BAIDBOT_MEMORY_BUFFER = 200  # number of messages to keep in memory from both user and baidbot
+BAIDBOT_MEMORY_BUFFER = 150  # number of messages to keep in memory from both user and baidbot
 
 steam = Steam(SteamAPIToken)
 oneshot_id = 420530
@@ -416,6 +416,38 @@ async def memegif(interaction: discord.Interaction, gif_file: discord.Attachment
         await interaction.followup.send(file=discord.File(ROOT_DIR / "meme_out.gif"))
     else:
         await interaction.response.send_message("File must be a GIF!")
+
+@client.tree.command(name="compress_img", description="Compress an image to desired filesize in megabytes")
+async def compress_img(interaction: discord.Interaction, img: discord.Attachment, filesize_mb: int = 10):
+    if 'image' not in img.content_type:
+        await interaction.response.send_message("File must be an image type!", ephemeral=True)
+        return
+    
+    # defer allows discord to wait for a response longer than 3 seconds
+    await interaction.response.defer()
+
+    # download the attached image
+    await img.save(ROOT_DIR / "uncompressed_image.jpeg")
+    temp_img = Image.open(ROOT_DIR / "uncompressed_image.jpeg").convert("RGB")
+
+    if os.path.getsize((ROOT_DIR / "uncompressed_image.jpeg")) <= filesize_mb * 1024 * 1024:
+        await interaction.followup.send("Image is already under desired size", ephemeral=True)
+        return
+    else:
+        img_quality = 100
+
+        temp_img.save(ROOT_DIR / "compressed_image.jpeg", "jpeg", optimize=True, quality=img_quality)
+        while os.path.getsize(ROOT_DIR / "compressed_image.jpeg") >= filesize_mb * 1024 * 1024:
+            img_quality -= 2
+            print(f"File is too large! Compressing image to {img_quality}% as JPEG")
+            temp_img.save(ROOT_DIR / "compressed_image.jpeg", "jpeg", optimize=True, quality=img_quality)
+
+            # if (somehow) image quality is at 0 and the file is still too large, return a message
+            if img_quality == 0 and os.path.getsize(ROOT_DIR / "uncompressed_image.jpeg") >= filesize_mb * 1024 * 1024:
+                await interaction.followup.send("Error, file is too large even with 0% quality", ephemeral=True)
+                return
+        await interaction.followup.send(file=discord.File(ROOT_DIR / "compressed_image.jpeg"), ephemeral=True)
+        return
 
 
 @client.tree.command(name="speechbubble", description="Add a speech bubble to top of an image")
