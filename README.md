@@ -8,9 +8,12 @@ A multi-functional bot for Discord that provides utility to myself and a couple 
 - **Modify input images/gifs to add text or a preset speechbubble as a reaction image**
 ![](https://raw.githubusercontent.com/CVScholtisek/baidbotDiscord/master/memeDemonstration.gif)
 - **Display an image on baid's [Microwave PC Display](https://github.com/Git-baid/Microwave-PC-LCD/tree/main)**
-<img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20230725_235057.jpg" width="300">
+<img src="https://github.com/Git-baid/Microwave-PC-LCD/blob/main/20250717_143217.jpg" width="300">
 
-- **Miscellaneous features such as an insurance timer for Tarkov, return bot ping, and /help**
+- **Talk to baidbotAI** (its not very smart...)
+<img src="https://github.com/Git-baid/baidbotDiscord/blob/master/baidbotaidemo.gif" width="500">
+
+- **and many more miscellaneous features!**
 
 
 # Command Help:
@@ -76,6 +79,15 @@ Folden's favorites data is synchronized between all servers the bot is in. Any e
 
 - Displays an image on baid's Microwave PC display. Does not require baid's PC to be on.
 
-~~**/toggleled**~~ *Removed*
+**/compress_image**
 
-~~- *Toggles IRL desklamp on baid's desk (only while pc is running)*~~
+- Compresses input image to desired size in mb (default 10mb)
+
+**/lightswitch**
+
+- Toggles the lightswitch in baid's room on/off (true/false)
+
+**/reset_ai**
+
+- Reset baidbotAI's message queue and response status
+
